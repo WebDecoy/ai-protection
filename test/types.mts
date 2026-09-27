@@ -22,3 +22,11 @@ const accountLimited = createAIProtection<{databaseId: string}>({
 const quotaDecision = await accountLimited.check(new Request('https://owned.test/chat'),{databaseId:'server-derived'});
 const retryAfter: number | undefined = quotaDecision.retryAfterSeconds;
 void retryAfter;
+
+const concurrentProtection = createAIProtection<{databaseId:string}>({
+ webdecoyUrl:'https://ingest.example.test',webdecoyKey:'server',propertyId:'11111111-1111-4111-8111-111111111111',scopeId:'chat',subjectSecret:'x'.repeat(32),resolveClientIP:()=>null,
+ concurrency:{ruleId:'chat',accountLimit:2,featureLimit:20,subject:user=>({accountId:user.databaseId})},
+});
+await concurrentProtection.concurrent(new Request('https://owned.test/chat'),({signal})=>{
+ signal.throwIfAborted();return {response:new Response('ok'),finished:Promise.resolve()};
+},{databaseId:'trusted'});

@@ -1,3 +1,4 @@
+import { prepareConcurrency } from './concurrency.mjs';
 import { prepareQuota } from './quota.mjs';
 import { isIP } from 'node:net';
 import { randomUUID } from 'node:crypto';
@@ -12,6 +13,7 @@ export function createAIProtection(options) {
   const admission = createAdmission(options);
   const rules = prepareRules(options.rules);
   const quota=prepareQuota(options);
+  const concurrency=prepareConcurrency(options);
   const telemetry = createTelemetry(options);
   const localSink = options.onObservation ?? (event => console.log(JSON.stringify(event)));
   const reporter = createReporter({...options, onObservation:async (event, runtime) => {
@@ -87,6 +89,7 @@ export function createAIProtection(options) {
     return reporter.send(event);
   }
   async function protect(request, handler, context = {}) {
+    if(concurrency)throw Error("Use protect.concurrent with an explicit completion promise when concurrency is configured");
     const decision = await check(request, context);
     const outcome = {handlerAttempted:false};
     try {
@@ -104,5 +107,40 @@ export function createAIProtection(options) {
       throw error;
     } finally { void report(decision, outcome); }
   }
-  return Object.assign(protect, {check, report, flush:reporter.flush});
+  async function untilStopped(value,signal){
+    let stop;
+    const aborted=new Promise((_,reject)=>{stop=()=>reject(signal.reason??Error('Protected work cancelled'));if(signal.aborted)stop();else signal.addEventListener('abort',stop,{once:true});});
+    try{return await Promise.race([Promise.resolve(value),aborted]);}finally{signal.removeEventListener('abort',stop);}
+  }
+  async function concurrent(request,handler,context={}) {
+    if(!concurrency)throw Error('Concurrency configuration required');
+    const admitted=await check(request,context);
+    if(admitted.conclusion==='deny'){
+      void report(admitted,{handlerAttempted:false});
+      return Response.json({error:admitted.reason,request_id:admitted.id},{status:admitted.status,headers:{'Cache-Control':'no-store',...(admitted.retryAfterSeconds?{'Retry-After':String(admitted.retryAfterSeconds)}:{})}});
+    }
+    const lease=await concurrency(context,request.signal);
+    const event=observations.get(admitted);observations.delete(admitted);
+    const decision=finish({...event,action:lease.denial?'denied':'forwarded'},[...admitted.checks,lease.check],lease.denial);
+    if(lease.denial){void report(decision,{handlerAttempted:false});return Response.json({error:decision.reason,request_id:decision.id},{status:decision.status,headers:{'Cache-Control':'no-store',...(decision.retryAfterSeconds?{'Retry-After':String(decision.retryAfterSeconds)}:{})}});}
+    let attempted=false;
+    try {
+      lease.signal.throwIfAborted();attempted=true;
+      const result=await untilStopped(handler({signal:lease.signal}),lease.signal);
+      if(!(result?.response instanceof Response)||!result.finished||typeof result.finished.then!=='function')throw Error('Return {response, finished}: finished must track provider/stream completion');
+      const completion=(async()=>{
+        let completed=false;
+        try{await untilStopped(result.finished,lease.signal);completed=!lease.signal.aborted;}catch{}
+        try{await lease.finish(completed);}catch{completed=false;}
+        await report(decision,{handlerAttempted:true,status:result.response.status,cancelled:request.signal.aborted,handlerError:!completed});
+      })();
+      completion.catch(()=>{});
+      if(options.waitUntil)options.waitUntil(completion);
+      return result.response; // Unchanged stream; app supplies the actual lifecycle.
+    }catch(error){
+      await lease.finish(false).catch(()=>{});
+      void report(decision,{handlerAttempted:attempted,cancelled:request.signal.aborted,handlerError:true});throw error;
+    }
+  }
+  return Object.assign(protect, {check, report, concurrent, flush:reporter.flush});
 }

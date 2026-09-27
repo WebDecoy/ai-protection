@@ -173,3 +173,30 @@ new policy versions deliberately create fresh counters. Bounds are 32 policies
 and 10,000 active account/session buckets per property. Quota-store errors and
 capacity limits do not change the detector's separate failure policy. State can
 commit just before a timeout, so a failed check does not prove no unit was used.
+
+
+## Distributed concurrency (unpublished, #1373)
+
+Optional concurrency policy shares per-account and property/feature capacity
+across app replicas. Defaults are observe/open; detector failure policy is
+independent. Authenticate first and derive the account ID from trusted server
+state. Keep rule IDs and subject secrets identical across replicas.
+
+Configure `concurrency: {ruleId: 'chat_v1', accountLimit: 2, featureLimit: 20,
+subject: user => ({accountId: user.databaseId})}` and call
+`protect.concurrent(request, async ({signal}) => ({response, finished}), user)`.
+Propagate signal to the provider. `finished` must be a Promise resolving only
+when all protected work has ended. The original Response is returned untouched.
+Use the host's waitUntil hook where required and validate host execution limits.
+The ordinary callable wrapper rejects concurrency configuration; `check` alone
+does not acquire a lease.
+
+Heartbeat TTL defaults to 30 seconds and maximum runtime to 300 seconds.
+Confirmed completion releases immediately. Errors, cancellation, crashes and
+lease loss retain capacity until maximum runtime, because cancellation is not
+proof a remote provider stopped. Upstream work must honor cancellation and have
+a real runtime bound. Fail-open outages cannot guarantee a concurrency cap.
+Released replay tombstones remain 24 hours: the pilot cap is 10,000 granted
+acquisitions/day/property and 32 policies/property. This is not a throughput SLA.
+The private app repository's `integrations/ai-abuse/CONCURRENCY.md` documents the
+wire contract, failure behavior, deployment order and validation evidence.

@@ -46,6 +46,12 @@ export interface AIProtectionOptions<Context = Record<string, unknown>> {
   detectorTimeoutMs?: number;
   baselineLimit?: number;
   baselineWindowMs?: number;
+  concurrency?: {
+    ruleId: string; subjectSecret?: string; accountLimit: number; featureLimit: number;
+    ttlSeconds?: number; maxSeconds?: number; timeoutMs?: number;
+    mode?: Mode; failureMode?: 'open' | 'closed';
+    subject(context: Context): {accountId: string};
+  };
   rules?: readonly LocalRule<Context>[];
   /** Shared admission quota. Configure only from trusted server code. */
   accountQuota?: {
@@ -73,6 +79,8 @@ export interface AIProtectionOptions<Context = Record<string, unknown>> {
 }
 export interface AIProtection<Context> {
   (request: Request, handler: () => Response | Promise<Response>, context: Context): Promise<Response>;
+  concurrent(request: Request, handler: (runtime: {signal: AbortSignal}) =>
+    {response: Response; finished: Promise<void>} | Promise<{response: Response; finished: Promise<void>}>, context: Context): Promise<Response>;
   check(request: Request, context: Context): Promise<ProtectionDecision>;
   report(decision: ProtectionDecision, outcome?: ReportOutcome): Promise<void>;
   /** Wait for currently pending reports, bounded by each report's timeout. */
