@@ -7,7 +7,7 @@ const root = new URL('..', import.meta.url);
 const dir = mkdtempSync(join(tmpdir(), 'webdecoy-ai-package-'));
 try {
   const [pack] = JSON.parse(execFileSync('npm', ['pack','--dry-run=false','--json','--ignore-scripts','--pack-destination',dir], {cwd:root,encoding:'utf8'}));
-  const expected = ['LICENSE','NEXTJS.md','README.md','account.mjs','admission.mjs','fetch.d.mts','fetch.mjs','observation.mjs','package.json'];
+  const expected = ['ARCHITECTURE.md','LICENSE','NEXTJS.md','README.md','account.mjs','admission.mjs','fetch.d.mts','fetch.mjs','observation.mjs','package.json','rules.mjs','reporting.mjs'];
   assert.deepEqual(pack.files.map(f=>f.path).sort(),expected.sort(), 'Unexpected package contents');
   const consumer=join(dir,'consumer');mkdirSync(consumer);
   writeFileSync(join(consumer,'package.json'), JSON.stringify({private:true,type:'module'}));

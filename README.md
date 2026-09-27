@@ -1,7 +1,8 @@
 # WebDecoy AI Protection
 
 Bot and abuse protection for AI-powered applications. A small Node.js SDK that
-checks requests before your application invokes a model.
+checks requests before your application invokes a model. Customer-defined rules run
+locally; proprietary bot detection runs in WebDecoy. See [architecture](ARCHITECTURE.md).
 
 **Alpha pilot. Initial npm publication pending.** Integration mechanics are tested;
 real-world detection accuracy and provider cost savings have not been established.
@@ -52,8 +53,11 @@ The guide documents trusted IP handling, cancellation and the complete integrati
 ## What happens
 
 1. Your application validates and authenticates the request.
-2. The SDK verifies its WebDecoy property/account binding and sends request metadata.
-3. In observation mode, the callback runs regardless of the verdict.
+2. Local rules evaluate server-supplied context. An enforced local denial stops
+   immediately, with no network call. Otherwise the SDK verifies its WebDecoy
+   property/account binding and sends request metadata.
+3. Cloud observation records bot verdicts without enforcing them. Each local
+   rule has its own observe/enforce mode; explicit customer policies still apply.
 4. With both local and account enforcement enabled on an entitled plan, block and
    challenge verdicts return HTTP 403 before the callback.
 5. An allowed response streams through unchanged.
@@ -61,7 +65,8 @@ The guide documents trusted IP handling, cancellation and the complete integrati
 WebDecoy outages **allow requests by default**. A missing or mismatched account
 binding falls back to observation and skips scoring. Missing trusted IPs also skip
 scoring and emit a degraded-coverage event. Successful chat alone does not prove
-protection is connected. Cancelled requests never start the protected callback.
+protection is connected. Cancelled requests never start the protected callback. Enforced local rule errors
+return 503 by default; this is separate from remote detector failure behavior.
 A challenge verdict has no interactive verification UI in this alpha.
 
 ## Data and scope
@@ -76,6 +81,15 @@ agent identity, model/tool authorization or spending caps. Keep your existing
 authentication, origin checks, request limits and user quotas. A metadata verdict
 is not proof that a caller is human.
 
+## Explicit decisions and reporting
+
+The callable wrapper remains available. For custom enforcement use
+`protect.check(request, trustedContext)`, inspect `conclusion`, `reason`,
+`degraded` and `checks`, then call `protect.report(decision, outcome)` once.
+Reporting is best-effort and separate from the decision. Attach `waitUntil` to
+hosting lifecycle support; see [the contract and examples](ARCHITECTURE.md).
+Local-only outcomes currently go to your observation sink, not the WebDecoy dashboard.
+
 ## Configuration
 
 Required: `webdecoyUrl` (HTTPS ingest origin; HTTP allowed only on loopback),
@@ -83,7 +97,9 @@ Required: `webdecoyUrl` (HTTPS ingest origin; HTTP allowed only on loopback),
 
 Optional: `protectionMode` (`enforce` by default; start pilots with `observe`),
 `detectorFailureMode` (`open` by default), `detectorTimeoutMs` (1000),
-`baselineLimit` (10), `baselineWindowMs` (60000), `onObservation` (JSON stdout).
+`baselineLimit` (10), `baselineWindowMs` (60000), `rules` (none),
+`onObservation` (JSON stdout), `waitUntil` (hosting lifecycle hook),
+`reportingTimeoutMs` (1000), and `maxPendingReports` (100).
 The baseline is a process-local shadow comparison, not an enforced rate limit.
 
 Verified account bindings cache for 60 seconds; failures cache for 5 seconds.
@@ -97,6 +113,7 @@ completion, model usage, blocked spend or successful provider cancellation.
 ```sh
 npm ci
 npm test
+npm run test:types
 npm run check:package
 cd examples/nextjs
 npm ci

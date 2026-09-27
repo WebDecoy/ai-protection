@@ -1,3 +1,4 @@
+import {after} from 'next/server';
 import {createAIProtection} from '@webdecoy/ai-protection';
 import {streamText, consumeStream, simulateReadableStream} from 'ai';
 import {MockLanguageModelV3} from 'ai/test';
@@ -11,6 +12,12 @@ function protection() {
     propertyId:process.env.WEBDECOY_PROPERTY_ID,
     scopeId:'example-chat', subjectSecret:process.env.WEBDECOY_SUBJECT_SECRET,
     protectionMode:process.env.WEBDECOY_MODE || 'observe',
+    waitUntil:task=>after(()=>task),
+    // Illustrative customer policy, independent of WebDecoy bot-detection mode.
+    rules:[{id:'plan_input_limit', mode:'enforce', evaluate:context=>({
+      allowed:context.plan==='paid' || context.inputLength<=4000,
+      reason:'plan_input_limit'
+    })}],
     // LOCAL FIXTURE ONLY. Production must resolve the actual address from trusted ingress.
     resolveClientIP:()=>process.env.WEBDECOY_LOCAL_FIXTURE === '1' ? '192.0.2.1' : null,
   });
@@ -33,5 +40,5 @@ export async function POST(request) {
     ]})})});
     return streamText({model,prompt:body.prompt,abortSignal:request.signal})
       .toUIMessageStreamResponse({consumeSseStream:consumeStream});
-  });
+  }, {plan:process.env.EXAMPLE_PLAN || 'free', inputLength:body.prompt.length});
 }

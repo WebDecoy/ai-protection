@@ -1,9 +1,9 @@
 import {createServer} from 'node:http';
 export async function fixture(t) {
-  const state = {decision:'allow', status:200, mode:'enforce', calls:0, events:[], payload:null};
+  const state = {decision:'allow', status:200, mode:'enforce', calls:0, events:[], payload:null, configCalls:0, configStatus:200};
   const server = createServer(async (req,res) => {
-    if (req.url.endsWith('/config')) return res.end(JSON.stringify({schema:1, mode:state.mode,
-      property_id:'11111111-1111-4111-8111-111111111111', organization_id:'22222222-2222-4222-8222-222222222222', observe:true,enforce:true}));
+    if (req.url.endsWith('/config')) { state.configCalls++; res.writeHead(state.configStatus); return res.end(JSON.stringify({schema:1, mode:state.mode,
+      property_id:'11111111-1111-4111-8111-111111111111', organization_id:'22222222-2222-4222-8222-222222222222', observe:true,enforce:true})); }
     state.calls++;
     let body=''; for await (const chunk of req) body+=chunk;
     state.payload=JSON.parse(body);

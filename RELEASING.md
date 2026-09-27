@@ -1,5 +1,8 @@
 # Releasing @webdecoy/ai-protection
 
+**Publication is on hold pending the owner’s license decision and pilot review.**
+The MIT file is a local draft, not approval to publish.
+
 Initial release is `0.1.0-alpha.1`, on the `alpha` dist-tag. Do not label this
 production-ready or change `latest` until the pilot is validated.
 

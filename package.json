@@ -6,8 +6,9 @@
   },
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "prepublishOnly": "npm test && npm run check:package",
-    "check:package": "node scripts/check-package.mjs"
+    "prepublishOnly": "npm test && npm run test:types && npm run check:package",
+    "check:package": "node scripts/check-package.mjs",
+    "test:types": "tsc --strict --noEmit --module nodenext --target es2022 test/types.mts"
   },
   "version": "0.1.0-alpha.1",
   "exports": {
@@ -28,7 +29,10 @@
     "observation.mjs",
     "README.md",
     "NEXTJS.md",
-    "LICENSE"
+    "LICENSE",
+    "rules.mjs",
+    "reporting.mjs",
+    "ARCHITECTURE.md"
   ],
   "description": "Bot and abuse protection for AI-powered applications. Server-side request admission for Node.js.",
   "license": "MIT",
@@ -50,5 +54,8 @@
     "bot-protection",
     "nextjs",
     "webdecoy"
-  ]
+  ],
+  "devDependencies": {
+    "typescript": "6.0.3"
+  }
 }

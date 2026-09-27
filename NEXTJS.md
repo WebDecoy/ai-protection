@@ -1,6 +1,6 @@
 # Next.js / AI SDK pilot integration
 
-Status: local, experimental Node server adapter. Not published to npm or deployed.
+Status: local, experimental Node server adapter with local rules and cloud detection. Not published to npm or deployed.
 No Next.js dependency in the adapter: it uses standard `Request` / `Response` and
 can be called by other Node frameworks, but only the Next.js example is tested.
 
@@ -52,6 +52,7 @@ need this checkout at runtime. The initial npm release is pending. Once publishe
 ```ts
 // app/api/chat/route.ts — incorporate into your existing authenticated route
 import { createAIProtection } from '@webdecoy/ai-protection';
+import { after } from 'next/server';
 
 export const runtime = 'nodejs';
 const protect = createAIProtection({
@@ -61,6 +62,7 @@ const protect = createAIProtection({
   subjectSecret: process.env.WEBDECOY_SUBJECT_SECRET!,
   scopeId: 'support-chat',
   protectionMode: 'observe',
+  waitUntil: task => after(() => task),
   resolveClientIP: trustedClientIP, // Your ingress-specific implementation; see below.
 });
 
@@ -85,11 +87,31 @@ Keep existing request-size limits at the ingress and application. The adapter
 never reads, clones or buffers the body. It does not add authentication, CORS,
 CSRF protection, user quotas, distributed rate limits or spending caps.
 
+## Local policies and explicit decisions
+
+The callable wrapper accepts a third argument containing trusted server context.
+Configure `rules` to inspect that context locally, or use `protect.check()` and
+`protect.report()` for custom response handling. See [the architecture contract](ARCHITECTURE.md).
+Context stays local. Rule IDs/reasons are stable non-sensitive codes that can enter logs.
+
+**Cloud observation does not override explicitly enforced local rules.** Each
+local rule defaults to observe; when explicitly enforced, its denial/error remains
+active during a cloud outage. The example's local `plan_input_limit` rule allows
+up to 4000 input characters for its server-configured free plan, while the route's
+input validation caps all prompts at 8000 characters. `EXAMPLE_PLAN` is a local
+fixture setting; production should load entitlements from authenticated server state.
+A `plan` field in the request body is ignored.
+
+The example uses Next.js `after()` to keep best-effort observation delivery tied
+to the request lifecycle. Local-only outcomes currently reach the sink (stdout by
+default), not WebDecoy's stored-detection dashboard. Remote detector records still
+follow existing backend storage behavior.
+
 ## Behavior customers should expect
 
-- Start with local and dashboard observation. Review real traffic and false
+- Start with cloud and dashboard observation, and each local rule in observe mode. Review real traffic and false
   positives before enabling both enforcement settings on an entitled plan.
-- Enforced block/challenge: JSON 403 before the protected callback. There is no
+- Enforced cloud block/challenge: JSON 403 before the protected callback. There is no
   interactive challenge flow; handle `verification_required` in the chat UI.
 - WebDecoy outage/timeouts: allow by default. Unknown account binding always
   observes and skips scoring. Missing trusted IP also skips scoring.
@@ -123,7 +145,7 @@ npm test
 The test starts a real Next.js production server and a local detector/account
 fixture; no secrets required. It checks authentication/input validation before
 scoring, UI-message SSE response, enforced rejection, and outage fail-open.
-Root `npm test` covers cancellation during admission, streaming cancellation,
+Root `npm test` covers local decisions, reporting failure isolation, cancellation during admission, streaming cancellation,
 unchanged response identity, metadata privacy and missing-IP behavior.
 
 For a real pilot, replace the mock model with the application's existing model,

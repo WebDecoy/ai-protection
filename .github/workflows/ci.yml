@@ -19,6 +19,7 @@ jobs:
           package-manager-cache: false
       - run: npm ci
       - run: npm test
+      - run: npm run test:types
       - run: npm run check:package
   nextjs:
     runs-on: ubuntu-latest
