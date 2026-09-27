@@ -13,3 +13,12 @@ void typed.check(new Request('https://example.test'));
 void typed.check(new Request('https://example.test'),{plan:'admin'});
 // @ts-expect-error Local rules cannot be asynchronous.
 createAIProtection({...base,rules:[{id:'async_rule',evaluate:async()=>({allowed:true})}]});
+
+const accountLimited = createAIProtection<{databaseId: string}>({
+  webdecoyUrl:'https://ingest.example.test',webdecoyKey:'server',propertyId:'11111111-1111-4111-8111-111111111111',
+  scopeId:'chat',subjectSecret:'x'.repeat(32),resolveClientIP:()=>null,
+  accountQuota:{ruleId:'chat_v1',limit:20,windowSeconds:60,mode:'enforce',subject:user=>({accountId:user.databaseId})},
+});
+const quotaDecision = await accountLimited.check(new Request('https://owned.test/chat'),{databaseId:'server-derived'});
+const retryAfter: number | undefined = quotaDecision.retryAfterSeconds;
+void retryAfter;

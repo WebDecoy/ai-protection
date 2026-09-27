@@ -1,3 +1,4 @@
+import { prepareQuota } from './quota.mjs';
 import { isIP } from 'node:net';
 import { randomUUID } from 'node:crypto';
 import { createAdmission } from './admission.mjs';
@@ -10,6 +11,7 @@ export function createAIProtection(options) {
   if (typeof options.resolveClientIP !== 'function') throw new Error('resolveClientIP is required');
   const admission = createAdmission(options);
   const rules = prepareRules(options.rules);
+  const quota=prepareQuota(options);
   const telemetry = createTelemetry(options);
   const localSink = options.onObservation ?? (event => console.log(JSON.stringify(event)));
   const reporter = createReporter({...options, onObservation:async (event, runtime) => {
@@ -25,7 +27,7 @@ export function createAIProtection(options) {
   function finish(observation, checks, denial) {
     const decision = Object.freeze({id:observation.request_id,
       conclusion:denial ? 'deny' : 'allow', reason:denial?.reason ?? 'allowed',
-      ...(denial ? {status:denial.status} : {}),
+      ...(denial ? {status:denial.status,...(denial.retryAfterSeconds ? {retryAfterSeconds:denial.retryAfterSeconds} : {})} : {}),
       degraded:checks.some(c => c.decision === 'unavailable' || c.reason === 'client_ip_unavailable'),
       checks:Object.freeze(checks.map(c => Object.freeze(c)))});
     observations.set(decision, {...observation, handler_attempted:false, decision:decision.conclusion,
@@ -45,6 +47,10 @@ export function createAIProtection(options) {
       return finish(skipped('local_denial'), [...local.checks,
         {id:'webdecoy',source:'remote',mode:options.protectionMode ?? 'enforce',decision:'skipped',reason:'local_denial',durationMs:0}], local.denial);
     }
+    const shared=await quota(context,request.signal);
+    if(shared.check)local.checks.push(shared.check);
+    if(shared.denial) return finish({...skipped('quota_denial'),action:shared.denial.status===503?'denied_unavailable':'denied'}, [...local.checks,
+      {id:'webdecoy',source:'remote',mode:options.protectionMode ?? 'enforce',decision:'skipped',reason:'quota_denial',durationMs:0}],shared.denial);
     const ip = await options.resolveClientIP(request);
     request.signal.throwIfAborted();
     if (typeof ip !== 'string' || !isIP(ip)) {
@@ -86,7 +92,7 @@ export function createAIProtection(options) {
     try {
       request.signal.throwIfAborted();
       if (decision.conclusion === 'deny') return Response.json({error:decision.reason, request_id:decision.id}, {
-        status:decision.status, headers:{'Cache-Control':'no-store', 'X-WebDecoy-Request-ID':decision.id}
+        status:decision.status, headers:{'Cache-Control':'no-store', 'X-WebDecoy-Request-ID':decision.id,...(decision.retryAfterSeconds?{'Retry-After':String(decision.retryAfterSeconds)}:{})}
       });
       outcome.handlerAttempted = true;
       const response = await handler();

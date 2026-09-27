@@ -127,3 +127,49 @@ npm test
 
 Tests use a local detector and local AI model; no live keys or paid inference.
 [Release instructions](RELEASING.md) cover publishing the public npm package.
+
+## Shared account quotas (opt-in)
+
+Configure `accountQuota` from trusted server code, after authenticating and
+validating the application's request:
+
+```js
+accountQuota: {
+  ruleId: 'chat_v1', limit: 20, windowSeconds: 60,
+  mode: 'enforce', failureMode: 'open',
+  subject: authenticated => ({accountId: authenticated.databaseId}),
+}
+```
+
+The subject callback is synchronous. Do not pass IDs or plan claims copied from
+browser headers/body. Optional `sessionLimit` and `sessionId` add a stricter session
+cap beneath the account cap; rotating sessions does not reset the account limit.
+The quota rule is independent of cloud/dashboard detection mode. It defaults to
+observation, with a one-second timeout and fail-open for state errors. Use
+`failureMode: 'closed'` explicitly to return 503 when a hard quota cannot be checked.
+Enforced exhaustion returns 429 and `Retry-After`; explicit `check` callers use
+`decision.retryAfterSeconds` and must enforce the decision themselves.
+
+This needs the shared quota backend (migration 78 and `/api/v1/sdk/ai-abuse/quota`).
+Observation and enforcement share counters. Each allowed admission consumes a
+unit, including retries and requests later cancelled/blocked by another check;
+there are no automatic retries, refunds, or reusable idempotency permits. Counters
+use fixed UTC windows: up to twice the limit can pass across a window boundary.
+This does not bound concurrent inference or establish model-cost savings.
+
+The account ID is HMAC-SHA256 pseudonymized with the property and rule ID before
+transmission; no raw context or prompt is added to quota/report payloads. The
+secret defaults to `subjectSecret` and must be identical across replicas. An
+explicit `accountQuota.subjectSecret` can separate quota identity from other SDK
+observations. Rotating it resets quotas; coordinate rotation after the longest
+window. These identifiers are correlatable pseudonyms, not anonymous data.
+Backend retention removes expired buckets on access and in an hourly sweep;
+healthy maximum retention is the 24-hour maximum window plus one sweep, with
+possible extension during cleanup failure/backlog.
+
+One rule ID binds immutable limit/window/session-limit settings. Inconsistent
+replicas receive an unavailable check, governed by the configured failure policy;
+new policy versions deliberately create fresh counters. Bounds are 32 policies
+and 10,000 active account/session buckets per property. Quota-store errors and
+capacity limits do not change the detector's separate failure policy. State can
+commit just before a timeout, so a failed check does not prove no unit was used.

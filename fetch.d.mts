@@ -11,7 +11,7 @@ export interface LocalRule<Context> {
 }
 export interface CheckResult {
   readonly id: string;
-  readonly source: 'local' | 'remote';
+  readonly source: 'local' | 'remote' | 'shared';
   readonly mode: Mode;
   readonly decision: 'allow' | 'deny' | 'challenge' | 'unavailable' | 'skipped';
   readonly reason: string;
@@ -22,6 +22,7 @@ export interface ProtectionDecision {
   readonly conclusion: 'allow' | 'deny';
   readonly reason: string;
   readonly status?: number;
+  readonly retryAfterSeconds?: number;
   readonly degraded: boolean;
   readonly checks: readonly CheckResult[];
 }
@@ -46,6 +47,21 @@ export interface AIProtectionOptions<Context = Record<string, unknown>> {
   baselineLimit?: number;
   baselineWindowMs?: number;
   rules?: readonly LocalRule<Context>[];
+  /** Shared admission quota. Configure only from trusted server code. */
+  accountQuota?: {
+    ruleId: string;
+    /** Defaults to the existing subjectSecret. Must match across replicas. */
+    subjectSecret?: string;
+    limit: number;
+    windowSeconds: number;
+    /** Optional stricter session cap, always beneath the account cap. */
+    sessionLimit?: number;
+    mode?: Mode;
+    /** Defaults to open; closed is an explicit availability tradeoff. */
+    failureMode?: 'open' | 'closed';
+    timeoutMs?: number;
+    subject(context: Context): {accountId: string; sessionId?: string};
+  };
   /** Async best-effort sink. Context/body/raw exceptions are never included by the SDK. */
   onObservation?(event: Record<string, unknown>, options: {signal: AbortSignal}): void | Promise<void>;
   /** Use hosting waitUntil or Next.js after(() => task) inside a request scope. */
