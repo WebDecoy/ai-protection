@@ -1,6 +1,6 @@
 const code = /^[a-z][a-z0-9_]{0,63}$/;
 export function prepareRules(rules = []) {
-  if (!Array.isArray(rules)) throw new Error('rules must be an array');
+  if (!Array.isArray(rules) || rules.length > 32) throw new Error('rules must be an array of at most 32 rules');
   const ids = new Set(['webdecoy']);
   return rules.map(rule => {
     if (!rule || typeof rule.id !== 'string' || !code.test(rule.id) || ids.has(rule.id) || typeof rule.evaluate !== 'function')

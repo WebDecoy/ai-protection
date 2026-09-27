@@ -27,7 +27,9 @@ test('block and challenge never call handler; observation and outage do',async t
 });
 test('missing trusted IP skips scoring and records degraded coverage',async t=>{
   const {state,options}=await fixture(t);
-  const response=await createAIProtection({...options,resolveClientIP:()=>null})(request(),()=>new Response('ok'));
+  const protect=createAIProtection({...options,resolveClientIP:()=>null});
+  const response=await protect(request(),()=>new Response('ok'));
+  await protect.flush();
   assert.equal(response.status,200);assert.equal(state.calls,0);assert.equal(state.events[0].reason,'client_ip_unavailable');
 });
 test('aborting during detection never calls handler despite fail-open',async t=>{

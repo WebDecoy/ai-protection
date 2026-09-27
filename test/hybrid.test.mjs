@@ -72,11 +72,11 @@ test('reporting rejection and lifecycle-hook failure do not reject or change the
 });
 
 test('slow reporting does not gate inference; queue is bounded, timeout aborts sink and flush completes',async t=>{
-  const {options}=await fixture(t);let signal,calls=0;const tasks=[];
+  const {options}=await fixture(t);let signal,calls=0;const tasks=[];let started;const ready=new Promise(resolve=>started=resolve);
   const protect=createAIProtection({...options,resolveClientIP:()=>null,reportingTimeoutMs:30,maxPendingReports:1,
-    onObservation:(_event,o)=>{calls++;signal=o.signal;return new Promise(()=>{});},waitUntil:p=>tasks.push(p)});
+    onObservation:(_event,o)=>{calls++;signal=o.signal;started();return new Promise(()=>{});},waitUntil:p=>tasks.push(p)});
   assert.equal((await protect(req(),()=>new Response('ok'))).status,200);
-  assert.equal(signal.aborted,false);
+  await ready;assert.equal(signal.aborted,false);
   await protect(req(),()=>new Response('also ok'));
   assert.equal(calls,1);assert.equal(tasks.length,1);
   await protect.flush();assert.equal(signal.aborted,true);

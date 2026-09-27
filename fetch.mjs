@@ -3,13 +3,23 @@ import { randomUUID } from 'node:crypto';
 import { createAdmission } from './admission.mjs';
 import { prepareRules, evaluateRules } from './rules.mjs';
 import { createReporter } from './reporting.mjs';
+import { createTelemetry } from './telemetry.mjs';
 
 // Node runtime only. Authentication and input validation belong before this API.
 export function createAIProtection(options) {
   if (typeof options.resolveClientIP !== 'function') throw new Error('resolveClientIP is required');
   const admission = createAdmission(options);
   const rules = prepareRules(options.rules);
-  const reporter = createReporter(options);
+  const telemetry = createTelemetry(options);
+  const localSink = options.onObservation ?? (event => console.log(JSON.stringify(event)));
+  const reporter = createReporter({...options, onObservation:async (event, runtime) => {
+    // Start telemetry before handing a separate event copy to the customer's sink.
+    // A sink cannot mutate the wire payload or prevent the other destination running.
+    const deliveries = await Promise.allSettled([
+      telemetry(event, runtime), Promise.resolve().then(() => localSink(structuredClone(event), runtime))
+    ]);
+    if (deliveries.some(result => result.status === 'rejected')) throw new Error('Report delivery failed');
+  }});
   // Private bookkeeping: no context, Request, body or raw rule errors retained.
   const observations = new WeakMap();
   function finish(observation, checks, denial) {

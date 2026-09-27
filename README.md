@@ -54,7 +54,7 @@ The guide documents trusted IP handling, cancellation and the complete integrati
 
 1. Your application validates and authenticates the request.
 2. Local rules evaluate server-supplied context. An enforced local denial stops
-   immediately, with no network call. Otherwise the SDK verifies its WebDecoy
+   immediately, without waiting for cloud detection. Otherwise the SDK verifies its WebDecoy
    property/account binding and sends request metadata.
 3. Cloud observation records bot verdicts without enforcing them. Each local
    rule has its own observe/enforce mode; explicit customer policies still apply.
@@ -72,7 +72,8 @@ A challenge verdict has no interactive verification UI in this alpha.
 ## Data and scope
 
 The SDK sends IP address, method, URL pathname (not query), user agent, header
-names, accept-language and accept-encoding values. It does **not** send request
+names, accept-language and accept-encoding values for detection. Separate reporting
+sends decision/check metadata and handler outcomes; see [the full schema](ARCHITECTURE.md#reporting-and-hosting-lifecycle). It does **not** send request
 bodies, prompts, cookies, authorization values or model responses. Avoid sensitive
 identifiers in URL paths. Keys stay in your server environment.
 
@@ -88,7 +89,10 @@ The callable wrapper remains available. For custom enforcement use
 `degraded` and `checks`, then call `protect.report(decision, outcome)` once.
 Reporting is best-effort and separate from the decision. Attach `waitUntil` to
 hosting lifecycle support; see [the contract and examples](ARCHITECTURE.md).
-Local-only outcomes currently go to your observation sink, not the WebDecoy dashboard.
+Application outcomes, including local denials and unavailable checks, are sent
+asynchronously to WebDecoy and your observation sink. The dashboard identifies
+these as SDK reports, separately from detector evidence. Central delivery requires
+the compatible reporting endpoint; `reportToWebDecoy: false` disables it.
 
 ## Configuration
 
@@ -99,7 +103,7 @@ Optional: `protectionMode` (`enforce` by default; start pilots with `observe`),
 `detectorFailureMode` (`open` by default), `detectorTimeoutMs` (1000),
 `baselineLimit` (10), `baselineWindowMs` (60000), `rules` (none),
 `onObservation` (JSON stdout), `waitUntil` (hosting lifecycle hook),
-`reportingTimeoutMs` (1000), and `maxPendingReports` (100).
+`reportingTimeoutMs` (1000), `maxPendingReports` (100), and `reportToWebDecoy` (true).
 The baseline is a process-local shadow comparison, not an enforced rate limit.
 
 Verified account bindings cache for 60 seconds; failures cache for 5 seconds.

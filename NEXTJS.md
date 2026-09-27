@@ -103,9 +103,12 @@ fixture setting; production should load entitlements from authenticated server s
 A `plan` field in the request body is ignored.
 
 The example uses Next.js `after()` to keep best-effort observation delivery tied
-to the request lifecycle. Local-only outcomes currently reach the sink (stdout by
-default), not WebDecoy's stored-detection dashboard. Remote detector records still
-follow existing backend storage behavior.
+to the request lifecycle. Local-only outcomes and degraded checks are sent to
+WebDecoy's application-decision reporting endpoint and the local sink (stdout by
+default). The dashboard distinguishes SDK reports from server-generated detector
+records; the same request ID correlates them. `reportToWebDecoy: false` opts out
+of central outcome reporting. Deploy the compatible reporting endpoint before
+enabling the pilot; absent/unavailable reporting never changes request decisions.
 
 ## Behavior customers should expect
 

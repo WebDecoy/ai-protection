@@ -50,6 +50,8 @@ export interface AIProtectionOptions<Context = Record<string, unknown>> {
   onObservation?(event: Record<string, unknown>, options: {signal: AbortSignal}): void | Promise<void>;
   /** Use hosting waitUntil or Next.js after(() => task) inside a request scope. */
   waitUntil?(task: Promise<void>): void;
+  /** Send bounded decision/outcome metadata to WebDecoy. Defaults to true; independent of the local sink. */
+  reportToWebDecoy?: boolean;
   reportingTimeoutMs?: number;
   maxPendingReports?: number;
 }

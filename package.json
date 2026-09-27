@@ -32,7 +32,8 @@
     "LICENSE",
     "rules.mjs",
     "reporting.mjs",
-    "ARCHITECTURE.md"
+    "ARCHITECTURE.md",
+    "telemetry.mjs"
   ],
   "description": "Bot and abuse protection for AI-powered applications. Server-side request admission for Node.js.",
   "license": "MIT",

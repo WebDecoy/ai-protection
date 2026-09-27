@@ -34,4 +34,7 @@ test('real Next.js + AI SDK route: authentication, validation, allow stream, den
   state.status=503;response=await send({prompt:'hello'});assert.equal(response.status,200);assert.match(await response.text(),/Local model response/);
   for(let i=0;i<100 && !output.includes('webdecoy_admission_skipped');i++)await new Promise(r=>setTimeout(r,10));
   assert.match(output,/webdecoy_admission_skipped/); // after() lifecycle receives local-only reports too.
+  for(let i=0;i<100 && !state.reports.some(r=>r.body.degraded);i++)await new Promise(r=>setTimeout(r,10));
+  assert.ok(state.reports.some(r=>r.body.reason==='plan_input_limit' && !r.body.handler_attempted));
+  assert.ok(state.reports.some(r=>r.body.degraded && r.body.handler_attempted));
 });

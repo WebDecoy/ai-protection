@@ -7,12 +7,12 @@ engine, prompt inspection or remote executable policies are shipped here.
 ```text
 Customer authenticates, validates input and loads trusted application context
   → synchronous local rules
-      enforced denial/error → decision (no cloud call)
+      enforced denial/error → decision (no blocking cloud check)
       otherwise → resolve trusted IP → WebDecoy account/config + detection
   → immutable combined decision
   → customer's application or convenience wrapper enforces it
   → response streams unchanged
-  → bounded, best-effort observation sink
+  → bounded, best-effort central reporting and application observation sink
 ```
 
 ## Decision API
@@ -75,7 +75,7 @@ are application policies, not paid WebDecoy detection features.
 
 All local rules run in declaration order; the first enforced denial determines
 HTTP status/reason. Local allow means continue evaluation, never bypass cloud
-protection. Any enforced local denial skips the network request. Rule throws,
+protection. Any enforced local denial skips the blocking detection request; reporting follows asynchronously. Rule throws,
 malformed values and accidental promises are `local_rule_error`; raw exceptions
 are never logged. A rule in enforce mode defaults to `failureMode: 'closed'`
 (503); explicit `open` permits later checks. Observe rules never enforce errors.
@@ -102,9 +102,32 @@ cached allow results must not accidentally bypass fresh checks or counters.
 ## Reporting and hosting lifecycle
 
 The remote `/sdk/detect` request still creates its existing server-side detection
-record. This change does not invent a new backend telemetry endpoint. Local-only
-decisions/outcomes go to `onObservation` (JSON stdout by default), and will **not**
-appear in WebDecoy's stored-detection dashboard without a future collector.
+record. A separate `POST /api/v1/sdk/ai-abuse/reports` endpoint receives the SDK's
+final decision/outcome, including local-only denials and degraded checks. The
+property-scoped key and matching `X-WebDecoy-Property-ID` assertion bind attribution;
+the payload cannot select a tenant. Unknown fields are rejected. Only request ID,
+timestamp, decision/reason, check IDs/sources/modes/verdicts/durations, degraded
+status, handler invocation/status and action are sent. Prompts, user IDs, context,
+raw IPs and subject hashes are excluded from this reporting payload.
+
+Central reporting is enabled by default (`reportToWebDecoy: true`). Set it to
+false to keep application observation without sending these reports. The local
+`onObservation` sink still defaults to JSON stdout and is independent: a failing
+custom sink cannot prevent central delivery, and vice versa. Do not place sensitive
+values in rule IDs/reason codes.
+
+Ingest deduplicates by organization/property/request ID: the first accepted report
+wins, including its receipt time. There are no automatic retries. Reports are
+bounded to 32 KiB and 33 checks (32 local rules plus cloud). The pilot endpoint
+limits traffic to 6000 reports/minute per source IP with a burst of 200; excess
+reports are dropped by this SDK after a generic warning, without affecting chat.
+
+The dashboard presents these as **SDK-reported application decisions**, separate
+from server-derived detector evidence. They are not summed into detection counts,
+charged as detections, or treated as proof of blocked inference or savings. The
+same request ID lets users correlate the two sources. Counts use receipt time;
+reports have a seven-day window and hourly retention cleanup. A prolonged outage
+can prevent delivery, so this is not complete audit coverage.
 
 `onObservation(event, {signal})` can return a promise. `report()` catches rejection,
 limits outstanding reports (`maxPendingReports`, default 100), and stops waiting

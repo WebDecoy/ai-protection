@@ -1,6 +1,6 @@
 # Hybrid SDK validation — 2026-09-26
 
-- All 16 SDK tests passed on Node 22 and Node 24.
+- All 16 initial hybrid SDK tests passed on Node 22 and Node 24.
 - TypeScript 6.0.3 checks passed, including required typed context, rejected async
   rule signatures and backward-compatible two-argument wrapper calls.
 - npm tarball verification passed: exact package-file allowlist and root/subpath
@@ -17,6 +17,21 @@
 All detector/account endpoints and model responses are deterministic fixtures.
 No real customer traffic, live detection-quality evaluation or provider cost
 measurement occurred. Cloud scoring still uses the existing API contract;
-local-only reports use the application sink and are not collected centrally yet.
+the initial hybrid stage used only an application sink. Central reporting was added
+in the follow-up below.
 No WebAssembly engine, detector verdict cache or distributed budget enforcement
 is implemented. Publication and the source license decision remain pending.
+
+## Central reporting follow-up
+
+- 19 SDK tests pass, including the explicit payload allowlist, local denial
+  without scoring, central delivery failure isolation, and telemetry opt-out.
+- TypeScript declarations and isolated npm tarball imports pass.
+- The WebDecoy ingest repository integration test runs this SDK over HTTP against
+  the actual Go report handler and verifies database persistence of a local denial.
+- Backend tests with real PostgreSQL migrations cover tenant/property isolation,
+  separate report counts and seven-day retention cleanup. Ingest tests cover
+  strict schema/size validation, property assertion, immutable deduplication,
+  and storage failures.
+- The dashboard's four browser tests and development build pass. This is local
+  integration validation; nothing is deployed and no live customer account was used.
