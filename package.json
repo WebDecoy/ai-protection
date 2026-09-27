@@ -1,0 +1,54 @@
+{
+  "name": "@webdecoy/ai-protection",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "prepublishOnly": "npm test && npm run check:package",
+    "check:package": "node scripts/check-package.mjs"
+  },
+  "version": "0.1.0-alpha.1",
+  "exports": {
+    "./fetch": {
+      "types": "./fetch.d.mts",
+      "import": "./fetch.mjs"
+    },
+    ".": {
+      "types": "./fetch.d.mts",
+      "import": "./fetch.mjs"
+    }
+  },
+  "files": [
+    "fetch.mjs",
+    "fetch.d.mts",
+    "admission.mjs",
+    "account.mjs",
+    "observation.mjs",
+    "README.md",
+    "NEXTJS.md",
+    "LICENSE"
+  ],
+  "description": "Bot and abuse protection for AI-powered applications. Server-side request admission for Node.js.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WebDecoy/ai-protection.git"
+  },
+  "homepage": "https://github.com/WebDecoy/ai-protection#readme",
+  "bugs": {
+    "url": "https://github.com/WebDecoy/ai-protection/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "alpha"
+  },
+  "keywords": [
+    "ai",
+    "security",
+    "bot-protection",
+    "nextjs",
+    "webdecoy"
+  ]
+}

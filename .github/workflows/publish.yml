@@ -1,0 +1,31 @@
+name: Publish alpha to npm
+on:
+  release:
+    types: [published]
+permissions:
+  contents: read
+jobs:
+  publish:
+    if: github.repository == 'WebDecoy/ai-protection'
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: npm install --global npm@11
+      - name: Verify release version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: node --input-type=module -e "import p from './package.json' with {type:'json'}; if(process.env.RELEASE_TAG!=='v'+p.version || !/^\d+\.\d+\.\d+-alpha\.\d+$/.test(p.version))throw Error('Expected matching alpha version tag');"
+      - run: npm ci
+      - run: npm test
+      - run: npm run check:package
+      - run: npm ci && npm run build -- --webpack && npm test
+        working-directory: examples/nextjs
+      - run: npm publish --access public --tag alpha

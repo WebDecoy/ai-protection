@@ -1,0 +1,108 @@
+# WebDecoy AI Protection
+
+Bot and abuse protection for AI-powered applications. A small Node.js SDK that
+checks requests before your application invokes a model.
+
+**Alpha pilot. Initial npm publication pending.** Integration mechanics are tested;
+real-world detection accuracy and provider cost savings have not been established.
+Requires a WebDecoy property, a property-scoped API key, and a compatible WebDecoy
+service deployment. This repository contains the SDK, not the detection service.
+
+## Install
+
+After the first npm release:
+
+```sh
+npm install @webdecoy/ai-protection@alpha
+```
+
+Until then, clone this repository, run `npm pack`, and install the resulting
+`webdecoy-ai-protection-0.1.0-alpha.1.tgz` in your application. Node.js 22 or newer
+is required. The SDK has no runtime npm dependencies. Edge runtimes are not supported.
+
+## Integrate
+
+Create the instance once in a **server-only module**, then call it inside your
+existing authenticated and validated AI endpoint:
+
+```ts
+import { createAIProtection } from '@webdecoy/ai-protection';
+
+const protect = createAIProtection({
+  webdecoyUrl: process.env.WEBDECOY_URL!,
+  webdecoyKey: process.env.WEBDECOY_KEY!,
+  propertyId: process.env.WEBDECOY_PROPERTY_ID!,
+  subjectSecret: process.env.WEBDECOY_SUBJECT_SECRET!, // random, >=32 characters
+  scopeId: 'support-chat',
+  protectionMode: 'observe',
+  resolveClientIP: trustedClientIP, // implement for your ingress; see setup guide
+});
+
+// Inside your route, AFTER auth, origin checks, input validation and quotas:
+// return protect(request, () => callYourModelAndReturnResponse(request.signal));
+```
+
+`trustedClientIP` and `callYourModelAndReturnResponse` represent your application's
+existing infrastructure/model code; they are not SDK exports. The protected
+callback returns a standard `Response` or `Promise<Response>`.
+
+See the [Next.js / AI SDK guide](NEXTJS.md) and the [runnable local example](examples/nextjs).
+The guide documents trusted IP handling, cancellation and the complete integration flow.
+
+## What happens
+
+1. Your application validates and authenticates the request.
+2. The SDK verifies its WebDecoy property/account binding and sends request metadata.
+3. In observation mode, the callback runs regardless of the verdict.
+4. With both local and account enforcement enabled on an entitled plan, block and
+   challenge verdicts return HTTP 403 before the callback.
+5. An allowed response streams through unchanged.
+
+WebDecoy outages **allow requests by default**. A missing or mismatched account
+binding falls back to observation and skips scoring. Missing trusted IPs also skip
+scoring and emit a degraded-coverage event. Successful chat alone does not prove
+protection is connected. Cancelled requests never start the protected callback.
+A challenge verdict has no interactive verification UI in this alpha.
+
+## Data and scope
+
+The SDK sends IP address, method, URL pathname (not query), user agent, header
+names, accept-language and accept-encoding values. It does **not** send request
+bodies, prompts, cookies, authorization values or model responses. Avoid sensitive
+identifiers in URL paths. Keys stay in your server environment.
+
+This SDK provides request admission, not prompt-injection filtering, verified
+agent identity, model/tool authorization or spending caps. Keep your existing
+authentication, origin checks, request limits and user quotas. A metadata verdict
+is not proof that a caller is human.
+
+## Configuration
+
+Required: `webdecoyUrl` (HTTPS ingest origin; HTTP allowed only on loopback),
+`webdecoyKey`, `propertyId`, `scopeId`, `subjectSecret`, `resolveClientIP`.
+
+Optional: `protectionMode` (`enforce` by default; start pilots with `observe`),
+`detectorFailureMode` (`open` by default), `detectorTimeoutMs` (1000),
+`baselineLimit` (10), `baselineWindowMs` (60000), `onObservation` (JSON stdout).
+The baseline is a process-local shadow comparison, not an enforced rate limit.
+
+Verified account bindings cache for 60 seconds; failures cache for 5 seconds.
+A cold binding lookup and detector call each have their own timeout (roughly two
+seconds total with defaults). Account changes are eventually consistent.
+Observation records describe admission and callback response creation, not stream
+completion, model usage, blocked spend or successful provider cancellation.
+
+## Develop
+
+```sh
+npm ci
+npm test
+npm run check:package
+cd examples/nextjs
+npm ci
+npm run build -- --webpack
+npm test
+```
+
+Tests use a local detector and local AI model; no live keys or paid inference.
+[Release instructions](RELEASING.md) cover publishing the public npm package.
