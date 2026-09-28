@@ -93,3 +93,30 @@ export interface ContextOptionalProtection extends AIProtection<Record<string, u
 }
 export function createAIProtection(options: AIProtectionOptions): ContextOptionalProtection;
 export function createAIProtection<Context>(options: AIProtectionOptions<Context>): AIProtection<Context>;
+
+/** All monetary values use integer micro-USD. Zero limits disable that scope/unit. */
+export interface BudgetLimits {
+ account_tokens?: number; account_micros?: number;
+ tenant_tokens?: number; tenant_micros?: number;
+ feature_tokens?: number; feature_micros?: number;
+}
+export interface BudgetPrice {
+ provider: string; model: string;
+ inputMicrosPerMillion: number; outputMicrosPerMillion: number;
+}
+export interface BudgetUsage {provider:string; model:string; inputTokens:number; outputTokens:number}
+export interface BudgetOutcome {reason:string; overrun:boolean; reserved:boolean; wouldDeny:boolean}
+export interface BudgetOptions<T> {
+ webdecoyUrl:string; webdecoyKey:string; propertyId:string; ruleId:string;
+ subjectSecret:string; windowSeconds:number; limits:BudgetLimits;
+ mode?:Mode; failureMode?:'open'|'closed'; timeoutMs?:number; maxRuntimeMs?:number;
+ prices:Record<string,BudgetPrice>;
+ subject(context:T):{accountId:string; organizationId:string};
+}
+export interface BudgetCall {priceId:string; maxInputTokens:number; maxOutputTokens:number}
+export class BudgetDenied extends Error {status:number;retryAfterSeconds:number}
+export function budgetCost(price:BudgetPrice,inputTokens:number,outputTokens:number):number;
+export function ollamaBudgetUsage(final:unknown):BudgetUsage|null;
+export function createAIBudget<T>(options:BudgetOptions<T>):{
+ run<V>(context:T,call:BudgetCall,work:(runtime:{provider:string;model:string;maxInputTokens:number;maxOutputTokens:number;signal:AbortSignal})=>{value:V;finished:Promise<BudgetUsage|null>}|Promise<{value:V;finished:Promise<BudgetUsage|null>}>,signal?:AbortSignal):Promise<{value:V;accounting:Promise<BudgetOutcome>}>;
+};

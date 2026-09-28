@@ -30,3 +30,9 @@ const concurrentProtection = createAIProtection<{databaseId:string}>({
 await concurrentProtection.concurrent(new Request('https://owned.test/chat'),({signal})=>{
  signal.throwIfAborted();return {response:new Response('ok'),finished:Promise.resolve()};
 },{databaseId:'trusted'});
+
+import {createAIBudget,ollamaBudgetUsage} from '../fetch.mjs';
+const budget = createAIBudget<{id:string;org:string}>({webdecoyUrl:'https://example.test',webdecoyKey:'server',propertyId:'11111111-1111-4111-8111-111111111111',ruleId:'chat',subjectSecret:'x'.repeat(32),windowSeconds:60,limits:{account_tokens:1000},prices:{local:{provider:'ollama',model:'fixture',inputMicrosPerMillion:0,outputMicrosPerMillion:0}},subject:u=>({accountId:u.id,organizationId:u.org})});
+const budgetRun=await budget.run({id:'a',org:'o'},{priceId:'local',maxInputTokens:10,maxOutputTokens:20},runtime=>({value:new Response(runtime.model),finished:Promise.resolve(ollamaBudgetUsage({done:true,model:'fixture',prompt_eval_count:10,eval_count:3}))}));
+const response:Response=budgetRun.value;
+void response;void budgetRun.accounting;

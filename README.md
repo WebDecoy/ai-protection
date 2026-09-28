@@ -200,3 +200,35 @@ Released replay tombstones remain 24 hours: the pilot cap is 10,000 granted
 acquisitions/day/property and 32 policies/property. This is not a throughput SLA.
 The private app repository's `integrations/ai-abuse/CONCURRENCY.md` documents the
 wire contract, failure behavior, deployment order and validation evidence.
+
+
+## Upstream model budgets (unpublished, #1374)
+
+Opt-in token and integer micro-USD budgets reserve a conservative maximum before
+each provider attempt and reconcile only confirmed usage. Configure account,
+customer-organization and feature limits, a fixed UTC window, a trusted subject
+callback, and an explicit versioned model price catalog. Rates use micro-USD per
+million input/output tokens. Unknown prices are rejected before work; an explicit
+zero rate is permitted for intentionally free model usage, not unmeasured hosting.
+
+Use exported `createAIBudget(options)`, then
+`budget.run(user, {priceId, maxInputTokens, maxOutputTokens}, work, signal)`.
+The callback gets `{provider, model, maxInputTokens, maxOutputTokens, signal}`
+and returns `{value, finished: Promise<BudgetUsage|null>}`. The result contains
+the identical `value` and an `accounting` Promise; keep the latter alive using
+host waitUntil where needed. `BudgetDenied` carries 429/503 and Retry-After
+metadata before work. Missing/rejected usage retains the maximum charge.
+
+Defaults are observe/open, independently of detector availability. A hard budget
+requires explicit enforce/closed plus correctly enforced input/output bounds,
+accurate complete prices/usage and no hidden provider retries. Every retry,
+fallback and tool-loop model call needs a fresh reservation. Cancellation/crash/
+missing usage never automatically refunds charges. An actual overrun records debt
+and signals overrun but cannot undo an already-billed call. Fixed-window accounting
+is based on admission time, not the provider's invoice period.
+
+There is an Ollama final-usage normalizer for native generate/chat metadata;
+other provider clients need a reviewed application adapter. The SDK never parses
+or stores prompts/outputs to meter usage. This does not change WebDecoy plans or
+create a subscription meter. The private app's `integrations/ai-abuse/BUDGETS.md`
+contains examples, supported workloads, privacy, capacity and release gates.

@@ -35,7 +35,8 @@
     "ARCHITECTURE.md",
     "telemetry.mjs",
     "quota.mjs",
-    "concurrency.mjs"
+    "concurrency.mjs",
+    "budget.mjs"
   ],
   "description": "Bot and abuse protection for AI-powered applications. Server-side request admission for Node.js.",
   "license": "MIT",
