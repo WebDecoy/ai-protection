@@ -39,7 +39,11 @@ export interface AIProtectionOptions<Context = Record<string, unknown>> {
   scopeId: string;
   subjectSecret: string;
   /** Return only an address vouched for by hosting ingress. Null skips cloud detection. */
-  resolveClientIP(request: Request): string | null | Promise<string | null>;
+  resolveClientIP(request: Request, runtime: {signal: AbortSignal}): string | null | Promise<string | null>;
+  /** Bounds waiting for the trusted resolver; defaults to 1000ms, maximum 10000. */
+  clientIPTimeoutMs?: number;
+  /** Explicit route template when URL paths contain identifiers. Never derived from browser input. */
+  route?: string;
   /** Applies to cloud bot detection only. */
   protectionMode?: Mode;
   /** Opt-in browser tag evidence. Exact first-party HTTPS origin; no API clients require cookies. */

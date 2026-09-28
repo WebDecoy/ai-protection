@@ -6,6 +6,7 @@ export function createReporter({onObservation = event => console.log(JSON.string
     throw new Error('Invalid reporting hooks');
   for (const value of [reportingTimeoutMs, maxPendingReports])
     if (!Number.isSafeInteger(value) || value <= 0) throw new Error('Invalid reporting bounds');
+  if(reportingTimeoutMs>10000||maxPendingReports>10000)throw Error('Reporting bounds exceed maximum');
   const pending = new Set();
   return {
     send(event) {

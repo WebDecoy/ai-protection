@@ -18,7 +18,7 @@ npm install @webdecoy/ai-protection@alpha
 ```
 
 Until then, clone this repository, run `npm pack`, and install the resulting
-`webdecoy-ai-protection-0.1.0-alpha.1.tgz` in your application. Node.js 22 or newer
+`webdecoy-ai-protection-0.1.0-alpha.1.tgz` in your application. Node.js 22.22.3 or newer
 is required. The SDK has no runtime npm dependencies. Edge runtimes are not supported.
 
 ## Integrate
@@ -35,6 +35,7 @@ const protect = createAIProtection({
   propertyId: process.env.WEBDECOY_PROPERTY_ID!,
   subjectSecret: process.env.WEBDECOY_SUBJECT_SECRET!, // random, >=32 characters
   scopeId: 'support-chat',
+  route: '/api/chat', // fixed route template; never a user ID or raw URL
   protectionMode: 'observe',
   resolveClientIP: trustedClientIP, // implement for your ingress; see setup guide
 });
@@ -268,3 +269,27 @@ rule codes, but no prompts, responses, model names or raw user identities. Use
 non-sensitive price/rule codes. Reporting remains bounded and best effort;
 failures do not change provider results, trigger retries or refund charges.
 Requires the compatible usage endpoint; old backends may log reporting failures.
+
+## Release and runtime contract
+
+The npm manifest is deliberately private while repository visibility and the
+license/publication decision are pending. `npm pack` and local installation work;
+public `npm publish` requires a reviewed release change. Source MIT text remains
+a draft distribution choice, not authorization to publish this checkout.
+
+Control-plane JSON responses are capped at 64 KiB (2 KiB for stateful controls).
+Detector/config timeouts default to 1000ms each, maximum 10000ms. Trusted IP
+resolution has its own `clientIPTimeoutMs` (1000ms default, maximum 10000ms) and
+receives `{signal}` as its second argument. On timeout, cloud detection is skipped
+with degraded coverage. Resolver exceptions remain application errors; caller
+cancellation always prevents the callback. Resolvers must cooperate with abort.
+
+Set `route` to a stable template such as `/accounts/{id}/chat` when paths contain
+identifiers. Otherwise the pathname is used, with query/fragment omitted. The SDK
+does not trust forwarding headers automatically. Header names and the documented
+metadata values still leave the app; never place secrets in those values.
+
+Reporting timeouts and queue capacity each have a maximum of 10000 (ms/events).
+Application rules and hooks must not block the event loop. There is no unconditional
+wall-clock SLA for arbitrary customer code or uncooperative hosting runtimes.
+See RELEASE.md for supported versions, installation and release checks.

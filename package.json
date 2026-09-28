@@ -2,7 +2,7 @@
   "name": "@webdecoy/ai-protection",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.22.3"
   },
   "scripts": {
     "test": "node --test test/*.test.mjs",
@@ -44,7 +44,9 @@
     "browser.mjs",
     "browser.d.mts",
     "browser-evidence.mjs",
-    "usage.mjs"
+    "usage.mjs",
+    "transport.mjs",
+    "RELEASE.md"
   ],
   "description": "Bot and abuse protection for AI-powered applications. Server-side request admission for Node.js.",
   "license": "MIT",
@@ -69,5 +71,6 @@
   ],
   "devDependencies": {
     "typescript": "6.0.3"
-  }
+  },
+  "private": true
 }

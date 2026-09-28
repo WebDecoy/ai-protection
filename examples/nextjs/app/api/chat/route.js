@@ -10,7 +10,7 @@ function protection() {
     webdecoyUrl:process.env.WEBDECOY_URL,
     webdecoyKey:process.env.WEBDECOY_KEY,
     propertyId:process.env.WEBDECOY_PROPERTY_ID,
-    scopeId:'example-chat', subjectSecret:process.env.WEBDECOY_SUBJECT_SECRET,
+    route:'/api/chat', scopeId:'example-chat', subjectSecret:process.env.WEBDECOY_SUBJECT_SECRET,
     protectionMode:process.env.WEBDECOY_MODE || 'observe',
     waitUntil:task=>after(()=>task),
     // Illustrative customer policy, independent of WebDecoy bot-detection mode.
@@ -27,7 +27,14 @@ export async function POST(request) {
   if (!process.env.EXAMPLE_TOKEN || request.headers.get('authorization') !== `Bearer ${process.env.EXAMPLE_TOKEN}`)
     return Response.json({error:'unauthorized'}, {status:401});
   let body;
-  try { body=await request.json(); } catch { return Response.json({error:'invalid_json'},{status:400}); }
+  try {
+    const reader=request.body?.getReader();if(!reader)throw Error('missing body');
+    const chunks=[];let bytes=0;
+    try {for(;;){const {done,value}=await reader.read();if(done)break;bytes+=value.length;
+      if(bytes>32768)return Response.json({error:'input_too_large'},{status:413});chunks.push(value);}
+      body=JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    } finally {await reader.cancel().catch(()=>{});reader.releaseLock();}
+  } catch { return Response.json({error:'invalid_json'},{status:400}); }
   if(typeof body?.prompt !== 'string' || !body.prompt.length || body.prompt.length>8000)
     return Response.json({error:'invalid_prompt'},{status:400});
   return protection()(request,()=>{

@@ -94,8 +94,9 @@ are never logged. A rule in enforce mode defaults to `failureMode: 'closed'`
 | Caller aborts | Stop; never start the protected callback |
 
 Only the existing verified account configuration is cached (60 seconds; failures
-5 seconds). We intentionally do not cache detector allow verdicts, implement
-distributed quotas or turn the process-local shadow counter into a spend limit.
+5 seconds). We do not cache detector allow verdicts or turn the process-local shadow counter
+into a spend limit. Explicit shared quota, concurrency and budget hooks use the
+server state protocols; they are independent of the detector cache.
 A secure decision cache needs explicit scoping, policy versions and invalidation;
 cached allow results must not accidentally bypass fresh checks or counters.
 
@@ -118,7 +119,7 @@ values in rule IDs/reason codes.
 
 Ingest deduplicates by organization/property/request ID: the first accepted report
 wins, including its receipt time. There are no automatic retries. Reports are
-bounded to 32 KiB and 33 checks (32 local rules plus cloud). The pilot endpoint
+bounded to 32 KiB and 36 checks (32 local rules, quota, concurrency, cloud and browser evidence). The pilot endpoint
 limits traffic to 6000 reports/minute per source IP with a burst of 200; excess
 reports are dropped by this SDK after a generic warning, without affecting chat.
 
@@ -152,3 +153,14 @@ long-lived Node service, call `flush()` during graceful shutdown. Tests can awai
 provider usage; wrapper records stop at Response creation.
 
 Reference: [Next.js after](https://nextjs.org/docs/app/api-reference/functions/after).
+
+## Current controls and usage reporting
+
+Shared account quotas run before remote detection. `concurrent` explicitly wraps
+bounded model work with distributed leases. `createAIBudget` reserves/settles each
+provider attempt; it is not an automatic middleware spending cap. Both controls
+default to observe/open; enforce/closed is an explicit state-availability tradeoff.
+Usage events are separate from schema-1 request reports and include numeric rates,
+tokens and call/request/reservation UUIDs. They do not include raw identities or
+model content. See README and RELEASE.md; backend contracts are maintained in the
+private app repository's integrations/ai-abuse documentation.

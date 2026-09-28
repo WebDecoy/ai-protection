@@ -1,3 +1,4 @@
+import {readJSON} from './transport.mjs';
 import {prepareBrowserOrigin,browserEvidenceInput} from './browser-evidence.mjs';
 import { createAccountBinding, validPropertyID } from './account.mjs';
 import { randomUUID } from 'node:crypto';
@@ -13,6 +14,7 @@ export function createAdmission(options) {
   for (const key of ['detectorTimeoutMs', 'baselineLimit', 'baselineWindowMs']) {
     if (!Number.isSafeInteger(c[key]) || c[key] <= 0) throw new Error(`Invalid ${key}`);
   }
+  if(c.detectorTimeoutMs>10000)throw Error('detectorTimeoutMs must be <=10000');
   const url = new URL(c.webdecoyUrl);
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.pathname !== '/' || url.search || url.hash ||
       (url.protocol !== 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))) throw new Error('Invalid detector origin');
@@ -56,7 +58,7 @@ export function createAdmission(options) {
           })
         });
         if (!response.ok) { await response.body?.cancel(); throw new Error('detector_http'); }
-        verdict = await response.json();
+        verdict = await readJSON(response);
         // Older servers ignore unknown request fields; require an explicit
         // acknowledgement so a legacy metadata-only allow cannot look protected.
         if (verdict?.decision_mode !== 'unified_v1') throw new Error('unsupported_decision_mode');

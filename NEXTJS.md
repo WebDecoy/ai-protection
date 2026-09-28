@@ -13,13 +13,14 @@ Browser → customer's /api/chat → existing auth / input checks
 ```
 
 Install in the application server that owns the model call, not the browser,
-Next.js middleware, or the model provider. Node >=22 is required; Edge runtime
+Next.js middleware, or the model provider. Node >=22.22.3 is required; Edge runtime
 is not supported. The application and provider traffic remain on customer
 infrastructure. WebDecoy receives the client IP, URL pathname (no query string),
 method, user agent, header names and accept-language/accept-encoding values.
-Prompts, cookies, authorization values and responses are not sent to WebDecoy.
+Request bodies, session cookies, authorization values and responses are not sent
+to WebDecoy. Opt-in browser evidence forwards only its WebDecoy receipt cookie.
 Avoid sensitive identifiers in route paths. This is a remote metadata decision,
-not a browser fingerprint or proof that a caller is human.
+not proof that a caller is human. Optional browser evidence is a separate opt-in.
 
 ## Install the local pilot
 
@@ -61,6 +62,7 @@ const protect = createAIProtection({
   propertyId: process.env.WEBDECOY_PROPERTY_ID!,
   subjectSecret: process.env.WEBDECOY_SUBJECT_SECRET!,
   scopeId: 'support-chat',
+  route: '/api/chat',
   protectionMode: 'observe',
   waitUntil: task => after(() => task),
   resolveClientIP: trustedClientIP, // Your ingress-specific implementation; see below.
@@ -79,13 +81,16 @@ with direct origin access blocked. Do not simply read arbitrary `X-Forwarded-For
 or `X-Real-IP` from public requests. The adapter validates a single IPv4/IPv6
 address, not a comma-separated forwarding chain. Missing/invalid addresses allow
 the request without scoring and emit `webdecoy_admission_skipped`; this is degraded
-coverage, not successful protection. Resolver exceptions propagate as application
-errors. Test spoofed forwarding headers against the deployed ingress before
+coverage, not successful protection. Resolver exceptions propagate as application errors. Async resolution has a
+1000ms default timeout and receives `{signal}` as a second argument; timeout skips
+cloud scoring as degraded coverage. Use `route` for an explicit non-sensitive
+route template. Test spoofed forwarding headers against the deployed ingress before
 switching to enforcement.
 
 Keep existing request-size limits at the ingress and application. The adapter
-never reads, clones or buffers the body. It does not add authentication, CORS,
-CSRF protection, user quotas, distributed rate limits or spending caps.
+never reads, clones or buffers the body. It does not add authentication, CORS or CSRF protection. Shared quota, concurrency
+and budget controls require their separate explicit configuration; the basic
+wrapper alone supplies none of those limits.
 
 ## Local policies and explicit decisions
 
@@ -125,8 +130,9 @@ enabling the pilot; absent/unavailable reporting never changes request decisions
 - Logs record callback invocation and returned HTTP status, **not** stream
   completion, model invocation, tokens saved or provider billing. Existing core
   `upstream_attempted` remains false: this adapter cannot observe model activity.
-- Account policy caches and per-call timeouts are documented in README. Cold
-  admission can wait roughly two seconds with defaults.
+- Account policy caches and per-call timeouts are documented in README. Cold remote admission can wait roughly two seconds with defaults, plus up to
+  one second of IP resolution. Optional quota, lease acquisition and reservation
+  each add their own deadline. See RELEASE.md.
 
 Use the AI SDK's documented `consumeSseStream: consumeStream` handling alongside
 `abortSignal` when returning UI streams. Provider cancellation/billing remains

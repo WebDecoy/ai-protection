@@ -1,3 +1,4 @@
+import {abortable} from './transport.mjs';
 import {browserEvidenceCheck} from './browser-evidence.mjs';
 export {createAIBudget, BudgetDenied, budgetCost, ollamaBudgetUsage} from './budget.mjs';
 import { prepareConcurrency } from './concurrency.mjs';
@@ -12,6 +13,9 @@ import { createTelemetry } from './telemetry.mjs';
 // Node runtime only. Authentication and input validation belong before this API.
 export function createAIProtection(options) {
   if (typeof options.resolveClientIP !== 'function') throw new Error('resolveClientIP is required');
+  const clientIPTimeoutMs=options.clientIPTimeoutMs??1000;
+  if(!Number.isInteger(clientIPTimeoutMs)||clientIPTimeoutMs<1||clientIPTimeoutMs>10000)throw Error('Invalid clientIPTimeoutMs');
+  if(options.route!==undefined&&(typeof options.route!=='string'||!options.route.startsWith('/')||options.route.length>512||/[?#\r\n]/.test(options.route)))throw Error('Invalid normalized route');
   const admission = createAdmission(options);
   const rules = prepareRules(options.rules);
   const quota=prepareQuota(options);
@@ -55,14 +59,25 @@ export function createAIProtection(options) {
     if(shared.check)local.checks.push(shared.check);
     if(shared.denial) return finish({...skipped('quota_denial'),action:shared.denial.status===503?'denied_unavailable':'denied'}, [...local.checks,
       {id:'webdecoy',source:'remote',mode:options.protectionMode ?? 'enforce',decision:'skipped',reason:'quota_denial',durationMs:0}],shared.denial);
-    const ip = await options.resolveClientIP(request);
+    const resolverController=new AbortController();
+    const resolverSignal=AbortSignal.any([request.signal,resolverController.signal]);
+    const timer=setTimeout(()=>resolverController.abort(),clientIPTimeoutMs);
+    let ip;
+    try {
+      ip=await abortable(Promise.resolve().then(()=>{resolverSignal.throwIfAborted();return options.resolveClientIP(request,{signal:resolverSignal});}),resolverSignal);
+    } catch(error) {
+      request.signal.throwIfAborted();
+      if(!resolverController.signal.aborted)throw error;
+      ip=null; // Resolver timeout is degraded coverage, never an abuse verdict.
+    } finally {clearTimeout(timer);}
+
     request.signal.throwIfAborted();
     if (typeof ip !== 'string' || !isIP(ip)) {
       return finish(skipped('client_ip_unavailable'), [...local.checks,
         {id:'webdecoy',source:'remote',mode:options.protectionMode ?? 'enforce',decision:'skipped',reason:'client_ip_unavailable',durationMs:0}]);
     }
     const result = await admission.check({ip, method:request.method,
-      path:new URL(request.url).pathname,
+      path:options.route??new URL(request.url).pathname,
       headers:Object.fromEntries(request.headers), signal:request.signal});
     const observation = result.observation;
     const remote = {id:'webdecoy',source:'remote',mode:observation.mode,

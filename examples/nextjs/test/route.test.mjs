@@ -23,6 +23,7 @@ test('real Next.js + AI SDK route: authentication, validation, allow stream, den
   const send=(body,auth=true)=>fetch(`${origin}/api/chat`,{method:'POST',headers:{'content-type':'application/json',...(auth?{authorization:'Bearer local-test-token'}:{})},body:JSON.stringify(body)});
   assert.equal((await send({prompt:'hello'},false)).status,401);assert.equal(state.calls,0);
   assert.equal((await send({prompt:9})).status,400);assert.equal(state.calls,0);
+  assert.equal((await send({prompt:'hello',padding:'x'.repeat(32769)})).status,413);assert.equal(state.calls,0);
   // Body-supplied plan cannot override authenticated/server plan context.
   const denied=await send({prompt:'x'.repeat(4001),plan:'paid'});
   assert.equal(denied.status,403);assert.equal((await denied.json()).error,'plan_input_limit');assert.equal(state.calls,0);
