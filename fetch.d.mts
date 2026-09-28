@@ -42,6 +42,8 @@ export interface AIProtectionOptions<Context = Record<string, unknown>> {
   resolveClientIP(request: Request): string | null | Promise<string | null>;
   /** Applies to cloud bot detection only. */
   protectionMode?: Mode;
+  /** Opt-in browser tag evidence. Exact first-party HTTPS origin; no API clients require cookies. */
+  browserEvidenceOrigin?: string;
   detectorFailureMode?: 'open' | 'closed';
   detectorTimeoutMs?: number;
   baselineLimit?: number;

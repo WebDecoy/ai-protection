@@ -74,7 +74,8 @@ A challenge verdict has no interactive verification UI in this alpha.
 The SDK sends IP address, method, URL pathname (not query), user agent, header
 names, accept-language and accept-encoding values for detection. Separate reporting
 sends decision/check metadata and handler outcomes; see [the full schema](ARCHITECTURE.md#reporting-and-hosting-lifecycle). It does **not** send request
-bodies, prompts, cookies, authorization values or model responses. Avoid sensitive
+bodies, prompts, session cookies, authorization values or model responses.
+When browser evidence is explicitly enabled, only the WebDecoy receipt cookie is sent. Avoid sensitive
 identifiers in URL paths. Keys stay in your server environment.
 
 This SDK provides request admission, not prompt-injection filtering, verified
@@ -232,3 +233,20 @@ other provider clients need a reviewed application adapter. The SDK never parses
 or stores prompts/outputs to meter usage. This does not change WebDecoy plans or
 create a subscription meter. The private app's `integrations/ai-abuse/BUDGETS.md`
 contains examples, supported workloads, privacy, capacity and release gates.
+
+## Optional browser evidence
+
+Add `data-runtime-evidence="true"` to the existing WebDecoy scanner tag and set
+`browserEvidenceOrigin` to the exact HTTPS site origin (no trailing slash).
+Requires the compatible ingest/CDN deployment and a same-origin AI endpoint.
+The SDK forwards only the property-specific WebDecoy receipt, never the other
+cookies. The signed observation expires after 60 seconds and is bound to the
+property, origin, IP and user agent. Missing or invalid evidence fails open and
+adds an unavailable `browser_evidence` check; a clean receipt never overrides
+another denial. This is optional risk evidence, not proof of a human or identity.
+Start in observe mode; real-world accuracy has not been established.
+
+In browser code, optionally `await prepareBrowserEvidence()` from
+`@webdecoy/ai-protection/browser` before your existing chat fetch. The helper
+waits at most 1500ms by default and returns `{available: boolean}`. Continue the
+request regardless; server admission decides. Load the opted-in tag first.

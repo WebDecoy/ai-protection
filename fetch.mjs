@@ -1,3 +1,4 @@
+import {browserEvidenceCheck} from './browser-evidence.mjs';
 export {createAIBudget, BudgetDenied, budgetCost, ollamaBudgetUsage} from './budget.mjs';
 import { prepareConcurrency } from './concurrency.mjs';
 import { prepareQuota } from './quota.mjs';
@@ -69,7 +70,8 @@ export function createAIProtection(options) {
       reason:observation.account_status !== 'verified' ? observation.account_status
         : observation.detector_decision === 'unavailable' ? 'detector_unavailable' : `detector_${observation.detector_decision}`,
       durationMs:observation.account_ms + observation.detector_ms};
-    const decision = finish(observation, [...local.checks, remote],
+    const browserChecks=options.browserEvidenceOrigin?[browserEvidenceCheck(observation.browser_evidence,observation.mode)]:[];
+    const decision = finish(observation, [...local.checks, remote,...browserChecks],
       result.allowed ? undefined : {reason:result.error,status:result.status});
     if (request.signal.aborted) {
       // No usable decision on cancellation; still emit a best-effort outcome.

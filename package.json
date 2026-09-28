@@ -19,6 +19,10 @@
     ".": {
       "types": "./fetch.d.mts",
       "import": "./fetch.mjs"
+    },
+    "./browser": {
+      "types": "./browser.d.mts",
+      "import": "./browser.mjs"
     }
   },
   "files": [
@@ -36,7 +40,10 @@
     "telemetry.mjs",
     "quota.mjs",
     "concurrency.mjs",
-    "budget.mjs"
+    "budget.mjs",
+    "browser.mjs",
+    "browser.d.mts",
+    "browser-evidence.mjs"
   ],
   "description": "Bot and abuse protection for AI-powered applications. Server-side request admission for Node.js.",
   "license": "MIT",

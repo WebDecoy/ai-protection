@@ -1,3 +1,4 @@
+import {prepareBrowserOrigin,browserEvidenceInput} from './browser-evidence.mjs';
 import { createAccountBinding, validPropertyID } from './account.mjs';
 import { randomUUID } from 'node:crypto';
 import { createBaseline, observationSubject } from './observation.mjs';
@@ -17,6 +18,7 @@ export function createAdmission(options) {
       (url.protocol !== 'https:' && !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))) throw new Error('Invalid detector origin');
   if (!c.webdecoyKey || /[\r\n]/.test(c.webdecoyKey) || !c.scopeId || typeof c.subjectSecret !== 'string' || c.subjectSecret.length < 32 || typeof c.onObservation !== 'function') throw new Error('Invalid admission configuration');
   if (!validPropertyID(c.propertyId)) throw new Error('An existing WebDecoy propertyId is required');
+  const browserOrigin=prepareBrowserOrigin(c.browserEvidenceOrigin);
   const accountBinding = createAccountBinding(c);
   const baseline = createBaseline({limit: c.baselineLimit, windowMs: c.baselineWindowMs});
   return {
@@ -45,6 +47,7 @@ export function createAdmission(options) {
           headers: {'Authorization': `Bearer ${c.webdecoyKey}`, 'Content-Type': 'application/json'},
           signal: AbortSignal.any([signal, AbortSignal.timeout(c.detectorTimeoutMs)]),
           body: JSON.stringify({
+            browser_evidence: browserEvidenceInput(browserOrigin,c.propertyId,headers),
             decision_mode: 'unified_v1',
             ai_admission: {request_id:requestId, mode},
             request_metadata: {method, path, ip, user_agent: headers['user-agent'] ?? '', timestamp: Date.now()},
@@ -59,6 +62,7 @@ export function createAdmission(options) {
         if (verdict?.decision_mode !== 'unified_v1') throw new Error('unsupported_decision_mode');
         if (!['allow', 'block', 'challenge'].includes(verdict?.decision)) throw new Error('invalid_verdict');
         observation.detector_decision = verdict.decision;
+        if(browserOrigin)observation.browser_evidence=['allow','block','challenge','missing','invalid'].includes(verdict.browser_evidence)?verdict.browser_evidence:'unsupported';
       } catch {
         if (mode === 'enforce' && c.detectorFailureMode === 'closed') {
           observation.action = 'denied_unavailable';
