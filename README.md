@@ -250,3 +250,21 @@ In browser code, optionally `await prepareBrowserEvidence()` from
 `@webdecoy/ai-protection/browser` before your existing chat fetch. The helper
 waits at most 1500ms by default and returns `{available: boolean}`. Continue the
 request regardless; server admission decides. Load the opted-in tag first.
+
+## Model-attempt reports
+
+Budget hooks now send separate start/finish events to WebDecoy automatically.
+Each attempt has a random call ID; pass the admission decision's request ID in
+`requestId` on the budget call (`decision.id`). The run returns `callId`.
+Keep `run.accounting` alive with host lifecycle support, then `budget.flush()`
+can drain queued reports. Budget reporting accepts `waitUntil`,
+`reportingTimeoutMs`, `maxPendingReports` and `reportToWebDecoy`.
+
+The dashboard labels callback starts and final usage as SDK-reported and joins
+retained reservations to confirm accounting. Neither is a provider invoice.
+Missing usage is unknown, and avoided cost is unavailable—not inferred from
+request denials. Usage events contain numeric tokens, configured rates and price/
+rule codes, but no prompts, responses, model names or raw user identities. Use
+non-sensitive price/rule codes. Reporting remains bounded and best effort;
+failures do not change provider results, trigger retries or refund charges.
+Requires the compatible usage endpoint; old backends may log reporting failures.

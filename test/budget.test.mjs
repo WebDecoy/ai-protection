@@ -10,6 +10,7 @@ async function fixture(t,kind='ok',extra={}){
  const server=http.createServer(async(req,res)=>{
   let raw='';for await(const chunk of req)raw+=chunk;
   assert.ok(!raw.includes('private-account'));assert.ok(!raw.includes('private-org'));assert.ok(!raw.includes('prompt text'));
+  if(req.url.endsWith('/usage')){res.writeHead(202);res.end();return;}
   const p=JSON.parse(raw);wire.push(p);
   if(kind==='outage'||kind==='settle_outage'&&p.operation==='settle'){res.writeHead(503);res.end();return}
   const r={schema:1,allowed:true,granted:p.operation==='reserve',reason:p.operation==='reserve'?'budget_allowed':'budget_settled',reservation_id:'22222222-2222-4222-8222-222222222222',retry_after_seconds:0,overrun:false};

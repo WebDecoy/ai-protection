@@ -112,13 +112,15 @@ export interface BudgetOptions<T> {
  webdecoyUrl:string; webdecoyKey:string; propertyId:string; ruleId:string;
  subjectSecret:string; windowSeconds:number; limits:BudgetLimits;
  mode?:Mode; failureMode?:'open'|'closed'; timeoutMs?:number; maxRuntimeMs?:number;
+ reportToWebDecoy?:boolean; waitUntil?:(task:Promise<void>)=>void; reportingTimeoutMs?:number; maxPendingReports?:number;
  prices:Record<string,BudgetPrice>;
  subject(context:T):{accountId:string; organizationId:string};
 }
-export interface BudgetCall {priceId:string; maxInputTokens:number; maxOutputTokens:number}
+export interface BudgetCall {requestId?:string; priceId:string; maxInputTokens:number; maxOutputTokens:number}
 export class BudgetDenied extends Error {status:number;retryAfterSeconds:number}
 export function budgetCost(price:BudgetPrice,inputTokens:number,outputTokens:number):number;
 export function ollamaBudgetUsage(final:unknown):BudgetUsage|null;
 export function createAIBudget<T>(options:BudgetOptions<T>):{
- run<V>(context:T,call:BudgetCall,work:(runtime:{provider:string;model:string;maxInputTokens:number;maxOutputTokens:number;signal:AbortSignal})=>{value:V;finished:Promise<BudgetUsage|null>}|Promise<{value:V;finished:Promise<BudgetUsage|null>}>,signal?:AbortSignal):Promise<{value:V;accounting:Promise<BudgetOutcome>}>;
+ flush():Promise<void>;
+ run<V>(context:T,call:BudgetCall,work:(runtime:{provider:string;model:string;maxInputTokens:number;maxOutputTokens:number;signal:AbortSignal})=>{value:V;finished:Promise<BudgetUsage|null>}|Promise<{value:V;finished:Promise<BudgetUsage|null>}>,signal?:AbortSignal):Promise<{value:V;accounting:Promise<BudgetOutcome>;callId:string}>;
 };
