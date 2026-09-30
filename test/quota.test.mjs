@@ -41,3 +41,34 @@ test('quota-store timeout fails open; caller cancellation still prevents inferen
   await protect.flush();
  }
 });
+
+test('v2 retries a lost acknowledgement with the same ID and exposes recovery ID locally',async t=>{
+ const {createQuotaOperationId}=await import('../fetch.mjs');const operationId=createQuotaOperationId();
+ const payloads=[];let consumed=0;
+ const url=await server(t,async(req,res)=>{
+  let raw='';for await(const b of req)raw+=b;payloads.push(JSON.parse(raw));
+  if(payloads.length===1){consumed++;req.socket.destroy();return;}
+  const p=payloads.at(-1);res.end(JSON.stringify({schema:2,operation_id:p.operation_id,allowed:true,reason:'account_quota_allowed',remaining:1,retry_after_seconds:0,reset_at:2000000000}));
+ });
+ const protect=createAIProtection({...base(url),accountQuota:{idempotency:true,operationId:ctx=>ctx.operationId,ruleId:'chat',limit:2,windowSeconds:60,mode:'enforce',failureMode:'closed',subject:()=>({accountId:'account'})}});
+ const decision=await protect.check(new Request('https://owned.test/chat'),{operationId});
+ assert.equal(decision.conclusion,'allow');assert.equal(payloads.length,2);assert.deepEqual(payloads[0],payloads[1]);assert.equal(consumed,1);
+ assert.equal(decision.checks.find(c=>c.id==='account_quota').operationId,operationId);
+});
+for(const status of [400,409,410,503])test(`v2 ${status} bounds retries without legacy fallback`,async t=>{
+ let calls=0;const url=await server(t,async(req,res)=>{for await(const _ of req){};calls++;res.writeHead(status);res.end('{}');});
+ const protect=createAIProtection({...base(url),accountQuota:{idempotency:true,ruleId:'chat',limit:1,windowSeconds:60,mode:'enforce',failureMode:'closed',subject:()=>({accountId:'account'})}});
+ const d=await protect.check(new Request('https://owned.test/chat'));
+ assert.equal(d.status,503);assert.equal(calls,status===503?2:1);assert.equal(d.reason,status===503?'account_quota_outcome_unknown':'account_quota_unavailable');
+});
+test('v2 caller cancellation prevents a retry',async t=>{
+ const ctl=new AbortController();let calls=0;
+ const url=await server(t,async(req,res)=>{for await(const _ of req){};calls++;ctl.abort();res.writeHead(503);res.end('{}');});
+ const protect=createAIProtection({...base(url),accountQuota:{idempotency:true,ruleId:'chat',limit:1,windowSeconds:60,subject:()=>({accountId:'account'})}});
+ await assert.rejects(protect.check(new Request('https://owned.test/chat',{signal:ctl.signal})));assert.equal(calls,1);
+});
+test('an unknown first outcome stays unknown when recovery is rejected',async t=>{
+ let calls=0;const url=await server(t,async(req,res)=>{for await(const _ of req){};res.writeHead(++calls===1?503:410);res.end('{}');});
+ const p=createAIProtection({...base(url),accountQuota:{idempotency:true,ruleId:'chat',limit:1,windowSeconds:60,mode:'enforce',failureMode:'closed',subject:()=>({accountId:'a'})}});
+ const d=await p.check(new Request('https://owned.test/chat'));assert.equal(calls,2);assert.equal(d.reason,'account_quota_outcome_unknown');
+});

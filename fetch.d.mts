@@ -16,6 +16,8 @@ export interface CheckResult {
   readonly decision: 'allow' | 'deny' | 'challenge' | 'unavailable' | 'skipped';
   readonly reason: string;
   readonly durationMs: number;
+  /** Local recovery ID for opt-in v2 quota admissions; omitted from central report payload. */
+  readonly operationId?: string;
 }
 export interface ProtectionDecision {
   readonly id: string;
@@ -71,7 +73,12 @@ export interface AIProtectionOptions<Context = Record<string, unknown>> {
     mode?: Mode;
     /** Defaults to open; closed is an explicit availability tradeoff. */
     failureMode?: 'open' | 'closed';
+    /** Per attempt; v2 permits at most two attempts. */
     timeoutMs?: number;
+    /** Opt-in schema 2; requires a migrated runtime. Never falls back to schema 1. */
+    idempotency?: boolean;
+    /** Stable ID from authenticated server state for recovery of the SAME logical admission. */
+    operationId?(context: Context): string;
     subject(context: Context): {accountId: string; sessionId?: string};
   };
   /** Async best-effort sink. Context/body/raw exceptions are never included by the SDK. */
@@ -128,3 +135,6 @@ export function createAIBudget<T>(options:BudgetOptions<T>):{
  flush():Promise<void>;
  run<V>(context:T,call:BudgetCall,work:(runtime:{provider:string;model:string;maxInputTokens:number;maxOutputTokens:number;signal:AbortSignal})=>{value:V;finished:Promise<BudgetUsage|null>}|Promise<{value:V;finished:Promise<BudgetUsage|null>}>,signal?:AbortSignal):Promise<{value:V;accounting:Promise<BudgetOutcome>;callId:string}>;
 };
+
+/** Create on the server and persist if recovery must survive process/request loss. */
+export function createQuotaOperationId(): string;

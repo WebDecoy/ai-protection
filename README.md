@@ -293,3 +293,31 @@ Reporting timeouts and queue capacity each have a maximum of 10000 (ms/events).
 Application rules and hooks must not block the event loop. There is no unconditional
 wall-clock SLA for arbitrary customer code or uncooperative hosting runtimes.
 See RELEASE.md for supported versions, installation and release checks.
+
+### Recovering an uncertain quota admission (opt-in)
+
+After your runtime supports quota schema 2, set `accountQuota.idempotency: true`.
+The SDK generates one server-side operation ID and retries the quota RPC at most
+once after transport/5xx/malformed-response failures, keeping the same ID and
+payload. `timeoutMs` applies per attempt (at most twice that time overall).
+Cancellation stops retries; HTTP 4xx stops retries; there is no schema-1 fallback.
+Legacy configuration remains schema 1 with no automatic retry.
+
+To recover the same admission across requests/processes, generate and persist
+`createQuotaOperationId()` in trusted server state, and supply
+`accountQuota.operationId: context => context.persistedOperationId`. The local
+quota check exposes `operationId`; it is omitted from central reports. Never take
+this ID directly from an untrusted browser or reuse it for different operations.
+
+IDs expire ten minutes after creation (database clock, 30-second forward skew
+allowance). Expired IDs are rejected even after receipt cleanup. Capacity is
+10,000 retained operations/property, including denials. Identical replays return
+the original decision; changed payloads conflict. An unresolved response is
+`account_quota_outcome_unknown`, distinct from a known quota denial. Existing
+open/closed settings still apply. After expiry, do not mint a fresh ID to retry an
+unknown operation blindly. The stored quota count/retry hint is an original-window
+snapshot, not current quota state.
+
+Only admission is deduplicated. Repeated application/model calls still require
+application-level idempotency. Deploy migration 83, grants and runtime support
+before enabling this option; no package publication is required for local testing.
