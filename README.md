@@ -153,9 +153,10 @@ Enforced exhaustion returns 429 and `Retry-After`; explicit `check` callers use
 `decision.retryAfterSeconds` and must enforce the decision themselves.
 
 This needs the shared quota backend (migration 78 and `/api/v1/sdk/ai-abuse/quota`).
-Observation and enforcement share counters. Each allowed admission consumes a
-unit, including retries and requests later cancelled/blocked by another check;
-there are no automatic retries, refunds, or reusable idempotency permits. Counters
+Observation and enforcement share counters. In default schema 1, each allowed
+admission consumes a unit, including retries and requests later cancelled/blocked
+by another check; there are no automatic retries or refunds. Opt-in schema 2
+adds bounded recovery of the same admission (see below). Counters
 use fixed UTC windows: up to twice the limit can pass across a window boundary.
 This does not bound concurrent inference or establish model-cost savings.
 
