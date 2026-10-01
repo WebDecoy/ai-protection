@@ -36,3 +36,14 @@ const budget = createAIBudget<{id:string;org:string}>({webdecoyUrl:'https://exam
 const budgetRun=await budget.run({id:'a',org:'o'},{priceId:'local',maxInputTokens:10,maxOutputTokens:20},runtime=>({value:new Response(runtime.model),finished:Promise.resolve(ollamaBudgetUsage({done:true,model:'fixture',prompt_eval_count:10,eval_count:3}))}));
 const response:Response=budgetRun.value;
 void response;void budgetRun.accounting;
+
+// Local action boundary: trusted authentication context is supplied by server code.
+import {createActionProtection, type TrustedCaller} from '../actions.mjs';
+const actionCaller: TrustedCaller = {schema:1, subject:'u', tenant:'t', issuer:'session',
+  authenticationMethod:'session', expiresAt:Date.now()+60000, scopes:['read']};
+const actions = createActionProtection({policyVersion:'v1',authenticate:(_session:string)=>actionCaller,
+  actions:{read:{requiredScopes:['read'],validate:()=>true,authorize:({caller})=>caller.tenant==='t',
+    execute:({signal})=>signal?.aborted??false}}});
+void actions.run('read',{id:'r'},'server-session');
+// @ts-expect-error Authentication context must match the server verifier.
+void actions.run('read',{},123);

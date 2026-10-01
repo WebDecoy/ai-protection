@@ -317,3 +317,11 @@ snapshot, not current quota state.
 
 Only admission is deduplicated. Repeated application/model calls still require
 application-level idempotency. The hosted runtime must support quota schema 2 before enabling this option.
+
+## Action authorization (unreleased development preview)
+
+The source checkout includes a local action boundary at `@webdecoy/ai-protection/actions`.
+It is not part of the published `0.1.0-alpha.2` package. See the
+[record-action example and integration contract](examples/actions/README.md).
+This preview requires your server authentication and application authorization;
+it does not include OAuth verification, an MCP adapter, or hosted action reporting.
