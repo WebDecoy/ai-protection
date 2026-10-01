@@ -25,6 +25,10 @@ jobs:
         working-directory: examples/auth0
       - run: npm test
         working-directory: examples/auth0
+      - run: npm ci
+        working-directory: examples/mcp
+      - run: npm test
+        working-directory: examples/mcp
   nextjs:
     runs-on: ubuntu-latest
     steps:

@@ -325,4 +325,6 @@ It is not part of the published `0.1.0-alpha.2` package. See the
 [record-action example and integration contract](examples/actions/README.md).
 This preview requires your server authentication and application authorization.
 An [Auth0 access-token example](examples/auth0/README.md) verifies signed tokens
-and maps tenant membership; an MCP adapter and hosted action reporting remain follow-ups.
+and maps tenant membership. The [TypeScript MCP integration](examples/mcp/README.md)
+protects stateless HTTP tool dispatch in a source-only example; an exported MCP
+package entrypoint and hosted action reporting remain follow-ups.
