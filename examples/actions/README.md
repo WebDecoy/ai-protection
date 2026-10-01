@@ -12,8 +12,8 @@ For OAuth, your verifier must validate issuer, audience/resource, expiry and
 scopes before returning a `TrustedCaller`. Never construct one from tool arguments,
 unsigned identity headers or an MCP session ID. A WebDecoy API key identifies the
 integrator, not the caller of the action. `clientId` is the authenticated OAuth
-client, not verified agent identity or delegated-user consent. Signer verification
-and a concrete OAuth integration are follow-up work.
+client, not verified agent identity or delegated-user consent. See the [Auth0 example](../auth0/README.md) for signed access-token verification.
+Live provider pilot validation and signer verification remain follow-up work.
 
 Each registered action supplies required scopes, argument validation, application
 authorization and execution. Only literal `true` admits validation/authorization.

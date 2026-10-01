@@ -323,5 +323,6 @@ application-level idempotency. The hosted runtime must support quota schema 2 be
 The source checkout includes a local action boundary at `@webdecoy/ai-protection/actions`.
 It is not part of the published `0.1.0-alpha.2` package. See the
 [record-action example and integration contract](examples/actions/README.md).
-This preview requires your server authentication and application authorization;
-it does not include OAuth verification, an MCP adapter, or hosted action reporting.
+This preview requires your server authentication and application authorization.
+An [Auth0 access-token example](examples/auth0/README.md) verifies signed tokens
+and maps tenant membership; an MCP adapter and hosted action reporting remain follow-ups.

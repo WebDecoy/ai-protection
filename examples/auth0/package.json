@@ -1,0 +1,1 @@
+{"name":"webdecoy-auth0-actions-example","private":true,"type":"module","scripts":{"test":"node --test *.test.mjs"},"dependencies":{"jose":"6.2.12"}}
