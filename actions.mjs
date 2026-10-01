@@ -1,5 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {abortable} from './transport.mjs';
+import {prepareActionRuntime} from './action-runtime.mjs';
 
 const token = /^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,95}$/;
 const bounded = value => typeof value === 'string' && value.length > 0 && value.length <= 512 && !/[\x00-\x1f\x7f]/.test(value);
@@ -74,24 +75,28 @@ export function createActionProtection(options) {
     actions.set(name, Object.freeze({...definition,requiredScopes:Object.freeze([...definition.requiredScopes])}));
   }
   if (!actions.size || actions.size > 128) throw Error('Expected 1–128 actions');
+  const runtime=prepareActionRuntime(options,actions);
   let pendingEvents = 0;
-  return Object.freeze({async run(name, input, authenticationContext, {signal} = {}) {
+  return Object.freeze({flush:async()=>{await runtime?.flush();},async run(name, input, authenticationContext, {signal} = {}) {
     const actionId = randomUUID();
     // Unknown caller-controlled action strings are never placed in evidence.
     const action = actions.get(name), eventAction = action ? name : 'unregistered';
-    let attempted = false;
+    let attempted = false,completed=false,lease;
+    const checks=[];
     const deadline = new AbortController();
     const admissionSignal = signal ? AbortSignal.any([signal, deadline.signal]) : deadline.signal;
     const timer = setTimeout(() => deadline.abort(new DOMException('Action admission timed out','TimeoutError')), admissionTimeoutMs);
     const evaluate = fn => abortable(Promise.resolve().then(() => { admissionSignal.throwIfAborted(); return fn(); }), admissionSignal);
     function emit(decision, reason, outcome) {
-      if (!sink || pendingEvents >= 100) return;
-      const event = Object.freeze({schema:1, actionId, action:eventAction, policyVersion,
-        evaluation:'local', decision, reason, attempted, outcome});
+
+      const event = Object.freeze({schema:1, eventId:randomUUID(), timestamp:new Date().toISOString(), actionId, action:eventAction, policyVersion,
+        evaluation:'local', decision, reason, attempted, outcome,checks:Object.freeze(checks.map(c=>Object.freeze({...c})))});
+      if(runtime)void runtime.report(event);
+      if(!sink||pendingEvents>=100)return;
       pendingEvents++;
       Promise.resolve().then(() => sink(event)).catch(() => {}).finally(() => { pendingEvents--; });
     }
-    function deny(reason, status) { emit('deny', reason, 'not_attempted'); throw new ActionDenied(reason, status, actionId); }
+    function deny(reason, status, retryAfterSeconds) { emit('deny', reason, 'not_attempted'); const e=new ActionDenied(reason,status,actionId);if(retryAfterSeconds)e.retryAfterSeconds=retryAfterSeconds;throw e; }
     function cancelled() { (attempted ? signal : admissionSignal)?.throwIfAborted(); }
     try {
       cancelled();
@@ -118,15 +123,35 @@ export function createActionProtection(options) {
         cancelled();
         if (permitted !== true) deny('policy_denied',403);
       }
+      // Shared limits run only after application permission checks. Their own
+      // RPC deadlines are separate from local admission and detector availability.
+      clearTimeout(timer);
+      const controls=runtime?.limits.get(name);
+      for(const gate of controls?.gates??[]){
+        const r=await gate(context,admissionSignal);checks.push(r.check);
+        if(r.denial)deny(r.denial.reason,r.denial.status,r.denial.retryAfterSeconds);
+      }
+      if(controls?.concurrency){
+        lease=await controls.concurrency(context,admissionSignal);checks.push(lease.check);
+        if(lease.denial)deny(lease.denial.reason,lease.denial.status,lease.denial.retryAfterSeconds);
+        lease.signal.throwIfAborted();
+      }
       // Authentication may expire while ownership/policy checks are running.
       if (caller.expiresAt <= Date.now()) deny('authentication_expired',401);
       cancelled();
       clearTimeout(timer);
       attempted = true;
       emit('allow','authorized','attempted');
-      const result = await action.execute(context);
+      const execution=Object.freeze({...context,signal:lease?.signal??context.signal});
+      const result = await action.execute(execution);
+      execution.signal.throwIfAborted();
       // Resolution is application completion, not proof of an external side effect.
       cancelled();
+      completed=true;
+      if(lease&&!lease.denial){
+        const began=performance.now();
+        try{await lease.finish(true);}catch{checks.push({id:'concurrency_release',source:'shared',mode:lease.check.mode,decision:'unavailable',reason:'concurrency_release_unavailable',durationMs:performance.now()-began});}
+      }
       emit('allow','authorized','completed');
       return result;
     } catch (error) {
@@ -134,6 +159,10 @@ export function createActionProtection(options) {
       if (attempted) emit('allow',signal?.aborted ? 'execution_cancelled' : 'execution_failed','unknown');
       else if (!(error instanceof ActionDenied)) emit('deny','admission_cancelled','not_attempted');
       throw error;
-    } finally { clearTimeout(timer); }
+    } finally {
+      clearTimeout(timer);
+      // Only confirmed completion (or no callback) releases; uncertain work holds.
+      if(lease&&!lease.denial)await lease.finish(!attempted||completed).catch(()=>{});
+    }
   }});
 }

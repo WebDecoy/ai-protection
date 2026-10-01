@@ -52,7 +52,8 @@
     "transport.mjs",
     "NOTICE",
     "actions.mjs",
-    "actions.d.mts"
+    "actions.d.mts",
+    "action-runtime.mjs"
   ],
   "description": "Bot and abuse protection for AI-powered applications. Server-side request admission for Node.js.",
   "license": "Apache-2.0",

@@ -86,8 +86,9 @@ Permission errors never become allowed because cloud detection is unavailable.
   work holds its active slot until it settles. Re-check ownership in the actual
   database transaction and use provider idempotency for writes.
 
-The wrapper is not yet an exported `/mcp` package entrypoint. Hosted action evidence,
-shared operation allowances and session/resumption support remain follow-ups.
+The wrapper is not yet an exported `/mcp` package entrypoint. Optional `sharedRuntime` enables caller/tenant quotas, concurrency and hosted
+action events through the underlying [action configuration](../actions/README.md#shared-limits-and-hosted-evidence-unreleased).
+Weighted work reservations and session/resumption support remain follow-ups.
 Neither installing npm `0.1.0-alpha.2` nor enabling dashboard enforcement installs
 this unreleased integration into a customer server.
 

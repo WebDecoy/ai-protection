@@ -2,7 +2,7 @@ import type {IncomingMessage, ServerResponse} from 'node:http';
 import {Server} from '@modelcontextprotocol/sdk/server/index.js';
 import {StreamableHTTPServerTransport} from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {CallToolRequestSchema,ListToolsRequestSchema,ErrorCode,McpError,type CallToolResult,type Tool} from '@modelcontextprotocol/sdk/types.js';
-import {createActionProtection,ActionDenied,type TrustedCaller,type ActionDefinition,type ActionEvent,type ActionInput} from '../../../actions.mjs';
+import {createActionProtection,ActionDenied,type TrustedCaller,type ActionDefinition,type ActionEvent,type ActionInput,type ActionRuntime} from '../../../actions.mjs';
 
 export interface ProtectedTool extends ActionDefinition {
   description: string;
@@ -13,6 +13,7 @@ export interface ProtectedMCPOptions {
   authorizationServer: string;
   authenticate(request: Request, options: {signal: AbortSignal}): Promise<TrustedCaller>;
   policyVersion: string;
+  sharedRuntime?: ActionRuntime;
   tools: Record<string,ProtectedTool>;
   allowedOrigins?: string[];
   onEvent?(event: ActionEvent): void | Promise<void>;
@@ -25,7 +26,7 @@ export function createProtectedMCPHandler(options: ProtectedMCPOptions) {
   const metadataURL=new URL(metadataPath,resource).href;
   const tools=Object.fromEntries(Object.entries(options.tools).map(([name,t])=>[name,{...t,requiredScopes:[...t.requiredScopes],inputSchema:structuredClone(t.inputSchema)}]));
   // Validate the closed registry at startup, not only after a client arrives.
-  createActionProtection({policyVersion:options.policyVersion,authenticate:options.authenticate,actions:tools});
+  createActionProtection({policyVersion:options.policyVersion,authenticate:options.authenticate,actions:tools,sharedRuntime:options.sharedRuntime});
   for(const tool of Object.values(tools))for(const scope of tool.requiredScopes)if(!/^[\x21\x23-\x5b\x5d-\x7e]+$/.test(scope))throw Error('Invalid OAuth scope');
   const active=new Map<string,{controller:AbortController;started:boolean}>();
   const scopes=[...new Set(Object.values(tools).flatMap(t=>t.requiredScopes))];
@@ -79,7 +80,7 @@ export function createProtectedMCPHandler(options: ProtectedMCPOptions) {
         active.get(callKey(message.params!.requestId))?.controller.abort();
         res.writeHead(202,{'Cache-Control':'no-store'});res.end();return;
       }
-      const guard=createActionProtection({policyVersion:options.policyVersion,authenticate:()=>caller,actions:tools,onEvent:options.onEvent});
+      const guard=createActionProtection({policyVersion:options.policyVersion,authenticate:()=>caller,actions:tools,sharedRuntime:options.sharedRuntime,onEvent:options.onEvent});
       // Scope escalation belongs at HTTP level, before the SDK opens an SSE stream.
       if(message.method==='tools/call' && typeof message.params?.name==='string'){
         const definition=Object.hasOwn(tools,message.params.name)?tools[message.params.name]:undefined;
@@ -113,7 +114,7 @@ export function createProtectedMCPHandler(options: ProtectedMCPOptions) {
           if(signal.aborted)throw new McpError(ErrorCode.InternalError,'Request cancelled');
           if(e instanceof ActionDenied)return {isError:true,content:[{type:'text',text:`Action denied: ${e.reason}`}]} satisfies CallToolResult;
           return {isError:true,content:[{type:'text',text:'Action failed; outcome may be unknown'}]} satisfies CallToolResult;
-        }finally{cleanup();}
+        }finally{cleanup();void guard.flush();}
       });
       await server.connect(transport);
       await transport.handleRequest(req,res,body);
