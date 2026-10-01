@@ -132,7 +132,7 @@ enabling the pilot; absent/unavailable reporting never changes request decisions
   `upstream_attempted` remains false: this adapter cannot observe model activity.
 - Account policy caches and per-call timeouts are documented in README. Cold remote admission can wait roughly two seconds with defaults, plus up to
   one second of IP resolution. Optional quota, lease acquisition and reservation
-  each add their own deadline. See RELEASE.md.
+  each add their own deadline. See the README configuration section.
 
 Use the AI SDK's documented `consumeSseStream: consumeStream` handling alongside
 `abortSignal` when returning UI streams. Provider cancellation/billing remains

@@ -10,7 +10,7 @@
     "check:package": "node scripts/check-package.mjs",
     "test:types": "tsc --strict --noEmit --module nodenext --target es2022 test/types.mts"
   },
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "exports": {
     "./fetch": {
       "types": "./fetch.d.mts",
@@ -46,7 +46,6 @@
     "browser-evidence.mjs",
     "usage.mjs",
     "transport.mjs",
-    "RELEASE.md",
     "NOTICE"
   ],
   "description": "Bot and abuse protection for AI-powered applications. Server-side request admission for Node.js.",

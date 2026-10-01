@@ -119,15 +119,13 @@ values in rule IDs/reason codes.
 
 Ingest deduplicates by organization/property/request ID: the first accepted report
 wins, including its receipt time. There are no automatic retries. Reports are
-bounded to 32 KiB and 36 checks (32 local rules, quota, concurrency, cloud and browser evidence). The pilot endpoint
-limits traffic to 6000 reports/minute per source IP with a burst of 200; excess
-reports are dropped by this SDK after a generic warning, without affecting chat.
+bounded to 32 KiB and 36 checks (32 local rules, quota, concurrency, cloud and browser evidence). Rate-limited reports are dropped by this SDK after a generic warning, without affecting chat.
 
 The dashboard presents these as **SDK-reported application decisions**, separate
 from server-derived detector evidence. They are not summed into detection counts,
 charged as detections, or treated as proof of blocked inference or savings. The
 same request ID lets users correlate the two sources. Counts use receipt time;
-reports have a seven-day window and hourly retention cleanup. A prolonged outage
+report availability depends on service retention. A prolonged outage
 can prevent delivery, so this is not complete audit coverage.
 
 `onObservation(event, {signal})` can return a promise. `report()` catches rejection,
@@ -162,5 +160,4 @@ provider attempt; it is not an automatic middleware spending cap. Both controls
 default to observe/open; enforce/closed is an explicit state-availability tradeoff.
 Usage events are separate from schema-1 request reports and include numeric rates,
 tokens and call/request/reservation UUIDs. They do not include raw identities or
-model content. See README and RELEASE.md; backend contracts are maintained in the
-private app repository's integrations/ai-abuse documentation.
+model content. See the README for configuration and integration examples.

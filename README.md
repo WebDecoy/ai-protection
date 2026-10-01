@@ -4,7 +4,7 @@ Bot and abuse protection for AI-powered applications. A small Node.js SDK that
 checks requests before your application invokes a model. Customer-defined rules run
 locally; proprietary bot detection runs in WebDecoy. See [architecture](ARCHITECTURE.md).
 
-**Alpha release: `0.1.0-alpha.1`.** Integration mechanics are tested;
+**Alpha release: `0.1.0-alpha.2`.** Integration mechanics are tested;
 real-world detection accuracy and provider cost savings have not been established.
 Requires a WebDecoy property, a property-scoped API key, and a compatible WebDecoy
 service deployment. This repository contains the SDK, not the detection service.
@@ -129,7 +129,7 @@ npm test
 ```
 
 Tests use a local detector and local AI model; no live keys or paid inference.
-[Release instructions](RELEASING.md) cover publishing the public npm package.
+Source and release history are available in this public repository.
 
 ## Shared account quotas (opt-in)
 
@@ -153,7 +153,7 @@ observation, with a one-second timeout and fail-open for state errors. Use
 Enforced exhaustion returns 429 and `Retry-After`; explicit `check` callers use
 `decision.retryAfterSeconds` and must enforce the decision themselves.
 
-This needs the shared quota backend (migration 78 and `/api/v1/sdk/ai-abuse/quota`).
+This uses the hosted `/api/v1/sdk/ai-abuse/quota` endpoint.
 Observation and enforcement share counters. In default schema 1, each allowed
 admission consumes a unit, including retries and requests later cancelled/blocked
 by another check; there are no automatic retries or refunds. Opt-in schema 2
@@ -179,7 +179,7 @@ capacity limits do not change the detector's separate failure policy. State can
 commit just before a timeout, so a failed check does not prove no unit was used.
 
 
-## Distributed concurrency (unpublished, #1373)
+## Distributed concurrency
 
 Optional concurrency policy shares per-account and property/feature capacity
 across app replicas. Defaults are observe/open; detector failure policy is
@@ -202,11 +202,9 @@ proof a remote provider stopped. Upstream work must honor cancellation and have
 a real runtime bound. Fail-open outages cannot guarantee a concurrency cap.
 Released replay tombstones remain 24 hours: the pilot cap is 10,000 granted
 acquisitions/day/property and 32 policies/property. This is not a throughput SLA.
-The private app repository's `integrations/ai-abuse/CONCURRENCY.md` documents the
-wire contract, failure behavior, deployment order and validation evidence.
 
 
-## Upstream model budgets (unpublished, #1374)
+## Upstream model budgets
 
 Opt-in token and integer micro-USD budgets reserve a conservative maximum before
 each provider attempt and reconcile only confirmed usage. Configure account,
@@ -234,8 +232,7 @@ is based on admission time, not the provider's invoice period.
 There is an Ollama final-usage normalizer for native generate/chat metadata;
 other provider clients need a reviewed application adapter. The SDK never parses
 or stores prompts/outputs to meter usage. This does not change WebDecoy plans or
-create a subscription meter. The private app's `integrations/ai-abuse/BUDGETS.md`
-contains examples, supported workloads, privacy, capacity and release gates.
+create a subscription meter.
 
 ## Optional browser evidence
 
@@ -292,7 +289,7 @@ metadata values still leave the app; never place secrets in those values.
 Reporting timeouts and queue capacity each have a maximum of 10000 (ms/events).
 Application rules and hooks must not block the event loop. There is no unconditional
 wall-clock SLA for arbitrary customer code or uncooperative hosting runtimes.
-See RELEASE.md for supported versions, installation and release checks.
+See the installation and configuration sections above for supported versions and setup.
 
 ### Recovering an uncertain quota admission (opt-in)
 
@@ -319,5 +316,4 @@ unknown operation blindly. The stored quota count/retry hint is an original-wind
 snapshot, not current quota state.
 
 Only admission is deduplicated. Repeated application/model calls still require
-application-level idempotency. Deploy migration 83, grants and runtime support
-before enabling this option; no package publication is required for local testing.
+application-level idempotency. The hosted runtime must support quota schema 2 before enabling this option.
