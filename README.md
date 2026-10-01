@@ -327,4 +327,6 @@ This preview requires your server authentication and application authorization.
 An [Auth0 access-token example](examples/auth0/README.md) verifies signed tokens
 and maps tenant membership. The [TypeScript MCP integration](examples/mcp/README.md)
 protects stateless HTTP tool dispatch in a source-only example; an exported MCP
-package entrypoint and hosted action reporting remain follow-ups.
+package entrypoint remains a follow-up. Optional shared quotas, concurrency and hosted
+action events are documented in the action guide and require the matching unreleased
+runtime/dashboard changes.

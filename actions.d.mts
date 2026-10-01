@@ -61,7 +61,7 @@ export class ActionDenied extends Error {
 export function createActionProtection<T>(options: {
   policyVersion: string;
   sharedRuntime?: ActionRuntime;
-  /** Bounds pre-execution checks only; default 1000 ms, max 10000. */
+  /** Bounds local admission checks; shared controls have their own RPC deadlines. Default 1000 ms, max 10000. */
   admissionTimeoutMs?: number;
   authenticate(context: T, options: {signal?: AbortSignal}): TrustedCaller | Promise<TrustedCaller>;
   actions: Record<string, ActionDefinition>;
