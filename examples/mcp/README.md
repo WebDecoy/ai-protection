@@ -95,3 +95,7 @@ this unreleased integration into a customer server.
 References: [MCP authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization),
 [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports),
 and the [Auth0 verifier example](../auth0/README.md).
+
+Enforced shared-limit denials use an MCP tool error. Its `_meta["webdecoy.com/action-error"]`
+contains the reason/status and bounded `retryAfterSeconds` when available. This
+provides retry guidance without retrying a tool or rewriting an open SSE response.

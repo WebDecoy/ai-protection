@@ -112,7 +112,8 @@ export function createProtectedMCPHandler(options: ProtectedMCPOptions) {
           return await guard.run(request.params.name,(request.params.arguments??{}) as ActionInput,null,{signal}) as CallToolResult;
         }catch(e){
           if(signal.aborted)throw new McpError(ErrorCode.InternalError,'Request cancelled');
-          if(e instanceof ActionDenied)return {isError:true,content:[{type:'text',text:`Action denied: ${e.reason}`}]} satisfies CallToolResult;
+          if(e instanceof ActionDenied)return {isError:true,content:[{type:'text',text:`Action denied: ${e.reason}`}],
+            _meta:{'webdecoy.com/action-error':{reason:e.reason,status:e.status,...(e.retryAfterSeconds?{retryAfterSeconds:e.retryAfterSeconds}:{})}}} satisfies CallToolResult;
           return {isError:true,content:[{type:'text',text:'Action failed; outcome may be unknown'}]} satisfies CallToolResult;
         }finally{cleanup();void guard.flush();}
       });
