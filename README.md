@@ -4,22 +4,23 @@ Bot and abuse protection for AI-powered applications. A small Node.js SDK that
 checks requests before your application invokes a model. Customer-defined rules run
 locally; proprietary bot detection runs in WebDecoy. See [architecture](ARCHITECTURE.md).
 
-**Alpha pilot. Initial npm publication pending.** Integration mechanics are tested;
+**Alpha release: `0.1.0-alpha.1`.** Integration mechanics are tested;
 real-world detection accuracy and provider cost savings have not been established.
 Requires a WebDecoy property, a property-scoped API key, and a compatible WebDecoy
 service deployment. This repository contains the SDK, not the detection service.
 
 ## Install
 
-After the first npm release:
-
 ```sh
 npm install @webdecoy/ai-protection@alpha
 ```
 
-Until then, clone this repository, run `npm pack`, and install the resulting
-`webdecoy-ai-protection-0.1.0-alpha.1.tgz` in your application. Node.js 22.22.3 or newer
-is required. The SDK has no runtime npm dependencies. Edge runtimes are not supported.
+Node.js 22.22.3 or newer is required. The SDK has no runtime npm dependencies.
+Edge runtimes are not supported. Licensed under [Apache-2.0](LICENSE).
+
+Set `WEBDECOY_URL=https://ai-protection.webdecoy.com` on your server.
+Create a property-scoped API key with Write Detections permission in WebDecoy,
+then review results at [AI Protection](https://app.webdecoy.com/ai-protection).
 
 ## Integrate
 
@@ -98,7 +99,7 @@ the compatible reporting endpoint; `reportToWebDecoy: false` disables it.
 
 ## Configuration
 
-Required: `webdecoyUrl` (HTTPS ingest origin; HTTP allowed only on loopback),
+Required: `webdecoyUrl` (HTTPS AI Protection API origin; HTTP allowed only on loopback),
 `webdecoyKey`, `propertyId`, `scopeId`, `subjectSecret`, `resolveClientIP`.
 
 Optional: `protectionMode` (`enforce` by default; start pilots with `observe`),
@@ -273,10 +274,8 @@ Requires the compatible usage endpoint; old backends may log reporting failures.
 
 ## Release and runtime contract
 
-The npm manifest is deliberately private while repository visibility and the
-license/publication decision are pending. `npm pack` and local installation work;
-public `npm publish` requires a reviewed release change. Source MIT text remains
-a draft distribution choice, not authorization to publish this checkout.
+The SDK is published under Apache-2.0 on the `alpha` npm dist-tag. WebDecoy's
+hosted detection service is separate and is not included in this package.
 
 Control-plane JSON responses are capped at 64 KiB (2 KiB for stateful controls).
 Detector/config timeouts default to 1000ms each, maximum 10000ms. Trusted IP

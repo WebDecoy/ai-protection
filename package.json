@@ -46,10 +46,11 @@
     "browser-evidence.mjs",
     "usage.mjs",
     "transport.mjs",
-    "RELEASE.md"
+    "RELEASE.md",
+    "NOTICE"
   ],
   "description": "Bot and abuse protection for AI-powered applications. Server-side request admission for Node.js.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WebDecoy/ai-protection.git"
@@ -71,6 +72,5 @@
   ],
   "devDependencies": {
     "typescript": "6.0.3"
-  },
-  "private": true
+  }
 }

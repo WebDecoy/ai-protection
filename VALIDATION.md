@@ -1,3 +1,5 @@
+> Historical validation record. Public alpha publication was approved on October 1, 2026 under Apache-2.0. See README for current installation.
+
 # Hybrid SDK validation — 2026-09-26
 
 - All 16 initial hybrid SDK tests passed on Node 22 and Node 24.

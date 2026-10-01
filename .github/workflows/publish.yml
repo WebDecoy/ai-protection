@@ -6,7 +6,7 @@ permissions:
   contents: read
 jobs:
   publish:
-    if: github.repository == 'WebDecoy/ai-protection'
+    if: github.repository == 'WebDecoy/ai-protection' && vars.NPM_TRUSTED_PUBLISHING == 'true'
     runs-on: ubuntu-latest
     environment: npm
     permissions:

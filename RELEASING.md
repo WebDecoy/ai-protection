@@ -1,7 +1,7 @@
 # Releasing @webdecoy/ai-protection
 
-**Publication is on hold pending the owner’s license decision and pilot review.**
-The MIT file is a local draft, not approval to publish.
+**Owner approved Apache-2.0 and public alpha publication on October 1, 2026.**
+The proprietary backend is not part of this release.
 
 Initial release is `0.1.0-alpha.1`, on the `alpha` dist-tag. Do not label this
 production-ready or change `latest` until the pilot is validated.
@@ -30,10 +30,13 @@ require npm's browser/2FA interaction. Verify:
 npm view @webdecoy/ai-protection@alpha version dist-tags
 ```
 
-After successful publication, update the README's pending-publication text. Do
-not claim that the registry install works before the package actually exists.
+Verify installation in a fresh consumer after publishing. Do not move the `latest` tag.
 
 ## Subsequent releases with GitHub Actions
+
+The first release is published manually. After configuring the trusted publisher
+and GitHub environment below, set repository variable `NPM_TRUSTED_PUBLISHING=true`
+to enable release-triggered publication. Until then that job is skipped.
 
 Configure an npm trusted publisher for:
 
