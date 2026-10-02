@@ -317,3 +317,16 @@ snapshot, not current quota state.
 
 Only admission is deduplicated. Repeated application/model calls still require
 application-level idempotency. The hosted runtime must support quota schema 2 before enabling this option.
+
+## Action authorization (unreleased development preview)
+
+The source checkout includes a local action boundary at `@webdecoy/ai-protection/actions`.
+It is not part of the published `0.1.0-alpha.2` package. See the
+[record-action example and integration contract](examples/actions/README.md).
+This preview requires your server authentication and application authorization.
+An [Auth0 access-token example](examples/auth0/README.md) verifies signed tokens
+and maps tenant membership. The [TypeScript MCP integration](examples/mcp/README.md)
+protects stateless HTTP tool dispatch in a source-only example; an exported MCP
+package entrypoint remains a follow-up. Optional shared quotas, concurrency and hosted
+action events are documented in the action guide and require the matching unreleased
+runtime/dashboard changes.

@@ -23,6 +23,10 @@
     "./browser": {
       "types": "./browser.d.mts",
       "import": "./browser.mjs"
+    },
+    "./actions": {
+      "types": "./actions.d.mts",
+      "import": "./actions.mjs"
     }
   },
   "files": [
@@ -46,7 +50,10 @@
     "browser-evidence.mjs",
     "usage.mjs",
     "transport.mjs",
-    "NOTICE"
+    "NOTICE",
+    "actions.mjs",
+    "actions.d.mts",
+    "action-runtime.mjs"
   ],
   "description": "Bot and abuse protection for AI-powered applications. Server-side request admission for Node.js.",
   "license": "Apache-2.0",
