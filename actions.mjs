@@ -59,7 +59,7 @@ function inputSnapshot(input) {
   return result;
 }
 
-/** Local protected dispatch. No network calls, cloud override, or automatic retry. */
+/** Protected dispatch with local permissions and optional shared controls. Never retries execution. */
 export function createActionProtection(options) {
   if (!options || typeof options.authenticate !== 'function' || (typeof options.policyVersion !== 'string' || !token.test(options.policyVersion))) throw Error('Invalid action configuration');
   const authenticate = options.authenticate, policyVersion = options.policyVersion, sink = options.onEvent;
@@ -81,7 +81,8 @@ export function createActionProtection(options) {
     const actionId = randomUUID();
     // Unknown caller-controlled action strings are never placed in evidence.
     const action = actions.get(name), eventAction = action ? name : 'unregistered';
-    let attempted = false,completed=false,lease;
+    let attempted = false,completed=false,lease,work;
+    const leases=[];
     const checks=[];
     const deadline = new AbortController();
     const admissionSignal = signal ? AbortSignal.any([signal, deadline.signal]) : deadline.signal;
@@ -90,7 +91,7 @@ export function createActionProtection(options) {
     function emit(decision, reason, outcome) {
 
       const event = Object.freeze({schema:1, eventId:randomUUID(), timestamp:new Date().toISOString(), actionId, action:eventAction, policyVersion,
-        evaluation:'local', decision, reason, attempted, outcome,checks:Object.freeze(checks.map(c=>Object.freeze({...c})))});
+        evaluation:'local', decision, reason, attempted, outcome,...(work?{work:Object.freeze({...work.evidence})}:{}),checks:Object.freeze(checks.map(c=>Object.freeze({...c})))});
       if(runtime)void runtime.report(event);
       if(!sink||pendingEvents>=100)return;
       pendingEvents++;
@@ -131,10 +132,14 @@ export function createActionProtection(options) {
         const r=await gate(context,admissionSignal);checks.push(r.check);
         if(r.denial)deny(r.denial.reason,r.denial.status,r.denial.retryAfterSeconds);
       }
-      if(controls?.concurrency){
-        lease=await controls.concurrency(context,admissionSignal);checks.push(lease.check);
+      for(const gate of controls?.concurrencies??[]){
+        lease=await gate(context,lease?.signal??admissionSignal);leases.push(lease);checks.push(lease.check);
         if(lease.denial)deny(lease.denial.reason,lease.denial.status,lease.denial.retryAfterSeconds);
         lease.signal.throwIfAborted();
+      }
+      if(controls?.work){
+        work=await controls.work(context,lease?.signal??admissionSignal);checks.push(work.check);
+        if(work.denial)deny(work.denial.reason,work.denial.status,work.denial.retryAfterSeconds);
       }
       // Authentication may expire while ownership/policy checks are running.
       if (caller.expiresAt <= Date.now()) deny('authentication_expired',401);
@@ -142,27 +147,29 @@ export function createActionProtection(options) {
       clearTimeout(timer);
       attempted = true;
       emit('allow','authorized','attempted');
-      const execution=Object.freeze({...context,signal:lease?.signal??context.signal});
+      const execution=Object.freeze({...context,...(work?{work:work.bound}:{}),signal:lease?.signal??context.signal});
       const result = await action.execute(execution);
       execution.signal.throwIfAborted();
       // Resolution is application completion, not proof of an external side effect.
       cancelled();
       completed=true;
-      if(lease&&!lease.denial){
+      if(work){const check=await work.finish(result,true);if(check)checks.push(check);}
+      for(const lease of [...leases].reverse())if(!lease.denial){
         const began=performance.now();
-        try{await lease.finish(true);}catch{checks.push({id:'concurrency_release',source:'shared',mode:lease.check.mode,decision:'unavailable',reason:'concurrency_release_unavailable',durationMs:performance.now()-began});}
+        try{await lease.finish(true);}catch{checks.push({id:lease.check.id==='tenant_concurrency'?'tenant_concurrency_release':'concurrency_release',source:'shared',mode:lease.check.mode,decision:'unavailable',reason:'concurrency_release_unavailable',durationMs:performance.now()-began});}
       }
       emit('allow','authorized','completed');
       return result;
     } catch (error) {
       if (!attempted && deadline.signal.aborted && !signal?.aborted) deny('admission_timeout',503);
+      if(work&&!completed)await work.finish(undefined,false);
       if (attempted) emit('allow',signal?.aborted ? 'execution_cancelled' : 'execution_failed','unknown');
       else if (!(error instanceof ActionDenied)) emit('deny','admission_cancelled','not_attempted');
       throw error;
     } finally {
       clearTimeout(timer);
       // Only confirmed completion (or no callback) releases; uncertain work holds.
-      if(lease&&!lease.denial)await lease.finish(!attempted||completed).catch(()=>{});
+      for(const lease of [...leases].reverse())if(!lease.denial)await lease.finish(!attempted||completed).catch(()=>{});
     }
   }});
 }

@@ -97,3 +97,5 @@ Call `await guard.flush()` during graceful shutdown. Attempt and completion are
 separate immutable event IDs with one action ID. No raw identity, arguments or
 results are uploaded. Dashboard events are SDK reports, not independently verified
 side-effect outcomes. Missing or out-of-order reports remain possible.
+
+Weighted tool-work reservations and tenant concurrency: [integration contract](../../WORK.md).

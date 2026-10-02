@@ -13,11 +13,27 @@ export interface TrustedCaller {
 }
 export type ActionInput = null | boolean | number | string | readonly ActionInput[] | {readonly [key:string]: ActionInput};
 export interface ActionContext {
+  readonly work?: {readonly maxUnits:number};
   readonly caller: TrustedCaller;
   readonly args: ActionInput;
   readonly signal?: AbortSignal;
 }
+export interface ActionWorkEvidence {
+ readonly rule_id:string;readonly mode:'observe'|'enforce';
+ readonly status:'reserved'|'settled'|'unknown'|'unavailable'|'denied'|'replay';
+ readonly reserved_units:number;readonly charged_units?:number;readonly remaining_units?:number;
+}
+export interface ActionWork {
+ ruleId:string;windowSeconds:number;maxUnits:number;
+ limits:{caller?:number;tenant?:number;tool?:number};
+ mode?:'observe'|'enforce';failureMode?:'open'|'closed';timeoutMs?:number;
+ /** Trusted server-generated persisted ID. Never use MCP request/session IDs or raw user input. */
+ operationId?(context:ActionContext):string;
+ /** Confirmed work after completed execution. No async/detached measurement; excess/unknown retains maximum. */
+ measure?(result:unknown,context:ActionContext):number;
+}
 export interface ActionEvent {
+  readonly work?:ActionWorkEvidence;
   readonly schema: 1;
   readonly eventId: string;
   readonly timestamp: string;
@@ -33,6 +49,8 @@ export interface ActionEvent {
 }
 export interface ActionQuota {ruleId:string;limit:number;windowSeconds:number;mode?:'observe'|'enforce';failureMode?:'open'|'closed';timeoutMs?:number}
 export interface ActionLimits {
+  tenantConcurrency?: ActionLimits['concurrency'];
+  work?:ActionWork;
   callerQuota?: ActionQuota;
   tenantQuota?: ActionQuota;
   concurrency?: {ruleId:string;accountLimit:number;featureLimit:number;mode?:'observe'|'enforce';failureMode?:'open'|'closed';ttlSeconds?:number;maxSeconds?:number;timeoutMs?:number};
