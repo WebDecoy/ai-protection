@@ -1,4 +1,4 @@
-# Protected MCP tools — unreleased TypeScript integration
+# Protected MCP tools — TypeScript source integration
 
 A runnable customer-server integration using MCP SDK **1.31.0**, protocol
 **2025-11-25**, and the source-only WebDecoy action boundary. No hosted proxy,
@@ -87,10 +87,11 @@ Permission errors never become allowed because cloud detection is unavailable.
   database transaction and use provider idempotency for writes.
 
 The wrapper is not yet an exported `/mcp` package entrypoint. Optional `sharedRuntime` enables caller/tenant quotas, concurrency and hosted
-action events through the underlying [action configuration](../actions/README.md#shared-limits-and-hosted-evidence-unreleased).
+action events through the underlying [action configuration](../actions/README.md#shared-limits-and-hosted-evidence).
 Weighted work reservations and session/resumption support remain follow-ups.
-Neither installing npm `0.1.0-alpha.2` nor enabling dashboard enforcement installs
-this unreleased integration into a customer server.
+Installing npm `0.1.0-alpha.3` provides the action API. The MCP wrapper remains a
+source example that must be integrated into your server; dashboard enforcement
+does not install it.
 
 References: [MCP authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization),
 [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports),

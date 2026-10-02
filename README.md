@@ -4,7 +4,7 @@ Bot and abuse protection for AI-powered applications. A small Node.js SDK that
 checks requests before your application invokes a model. Customer-defined rules run
 locally; proprietary bot detection runs in WebDecoy. See [architecture](ARCHITECTURE.md).
 
-**Alpha release: `0.1.0-alpha.2`.** Integration mechanics are tested;
+**Alpha release: `0.1.0-alpha.3`.** Integration mechanics are tested;
 real-world detection accuracy and provider cost savings have not been established.
 Requires a WebDecoy property, a property-scoped API key, and a compatible WebDecoy
 service deployment. This repository contains the SDK, not the detection service.
@@ -318,15 +318,13 @@ snapshot, not current quota state.
 Only admission is deduplicated. Repeated application/model calls still require
 application-level idempotency. The hosted runtime must support quota schema 2 before enabling this option.
 
-## Action authorization (unreleased development preview)
+## Action authorization (Alpha)
 
-The source checkout includes a local action boundary at `@webdecoy/ai-protection/actions`.
-It is not part of the published `0.1.0-alpha.2` package. See the
+Version `0.1.0-alpha.3` includes an action boundary at `@webdecoy/ai-protection/actions`. See the
 [record-action example and integration contract](examples/actions/README.md).
-This preview requires your server authentication and application authorization.
+This API requires your server authentication and application authorization.
 An [Auth0 access-token example](examples/auth0/README.md) verifies signed tokens
 and maps tenant membership. The [TypeScript MCP integration](examples/mcp/README.md)
 protects stateless HTTP tool dispatch in a source-only example; an exported MCP
 package entrypoint remains a follow-up. Optional shared quotas, concurrency and hosted
-action events are documented in the action guide and require the matching unreleased
-runtime/dashboard changes.
+action events are documented in the action guide and use the hosted AI Protection runtime and dashboard.
