@@ -4,8 +4,8 @@ A runnable customer-server integration using MCP SDK **1.31.0**, protocol
 **2025-11-25**, and the WebDecoy `/mcp` package entrypoint. No hosted proxy,
 WebDecoy API key, model calls, or paid inference is required for the fixture.
 The MCP SDK is an optional peer; core-only installs do not pull it in.
-This repository example links the root SDK with `file:../..`. Published alpha.3
-does not contain `/mcp`; see the [package installation guide](../../MCP.md).
+This repository example links the root SDK with `file:../..`. Install `0.1.0-alpha.4` for the published `/mcp` entrypoint; see the
+[package installation guide](../../MCP.md).
 
 ## Run the integration tests
 
@@ -93,9 +93,9 @@ The example re-exports `@webdecoy/ai-protection/mcp`; there is no separate copy 
 the transport wrapper. Optional `sharedRuntime` enables caller/tenant quotas, concurrency and hosted
 action events through the underlying [action configuration](../actions/README.md#shared-limits-and-hosted-evidence).
 Weighted work reservations and session/resumption support remain follow-ups.
-Installing npm `0.1.0-alpha.3` provides the action API only. The new MCP entrypoint
-is not published yet. Integrating either API requires application code; dashboard
-enforcement does not install it.
+Installing npm `0.1.0-alpha.4` provides both the action API and MCP entrypoint.
+Integrating either API requires application code; dashboard enforcement does not
+install it.
 
 References: [MCP authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization),
 [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports),
