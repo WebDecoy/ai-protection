@@ -8,7 +8,7 @@
     "test": "node --test test/*.test.mjs",
     "prepublishOnly": "npm test && npm run test:types && npm run check:package",
     "check:package": "node scripts/check-package.mjs",
-    "test:types": "tsc --strict --noEmit --module nodenext --target es2022 test/types.mts"
+    "test:types": "tsc --strict --noEmit --module nodenext --target es2022 test/types.mts test/mcp-types.mts"
   },
   "version": "0.1.0-alpha.3",
   "exports": {
@@ -27,6 +27,10 @@
     "./actions": {
       "types": "./actions.d.mts",
       "import": "./actions.mjs"
+    },
+    "./mcp": {
+      "types": "./mcp.d.mts",
+      "import": "./mcp.mjs"
     }
   },
   "files": [
@@ -53,7 +57,10 @@
     "NOTICE",
     "actions.mjs",
     "actions.d.mts",
-    "action-runtime.mjs"
+    "action-runtime.mjs",
+    "mcp.mjs",
+    "mcp.d.mts",
+    "MCP.md"
   ],
   "description": "Bot and abuse protection for AI-powered applications. Server-side request admission for Node.js.",
   "license": "Apache-2.0",
@@ -77,6 +84,16 @@
     "webdecoy"
   ],
   "devDependencies": {
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "@modelcontextprotocol/sdk": "1.31.0",
+    "@types/node": "22.19.15"
+  },
+  "peerDependencies": {
+    "@modelcontextprotocol/sdk": "1.31.0"
+  },
+  "peerDependenciesMeta": {
+    "@modelcontextprotocol/sdk": {
+      "optional": true
+    }
   }
 }
