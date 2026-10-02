@@ -1,11 +1,11 @@
-# Protected record actions (development preview)
+# Protected record actions (Alpha)
 
 Run `node examples/actions/records.mjs` from this source checkout. It performs one
 permitted read, denies a cross-tenant read and an export, and rejects a forged
 session. Independent counters assert exactly one read and zero exports. No paid
 provider or WebDecoy credentials are needed.
 
-The `/actions` API is unreleased. It is a local dispatch boundary, not an MCP
+The `/actions` API is available in `0.1.0-alpha.3`. It is a local dispatch boundary, not an MCP
 adapter or an identity provider. `authenticate` must call your existing server
 session/token verifier; the example's in-memory sessions are only a fixture.
 For OAuth, your verifier must validate issuer, audience/resource, expiry and
@@ -51,7 +51,7 @@ observer. Do not treat events as a complete audit trail or retry an action becau
 an event is absent.
 
 
-## Shared limits and hosted evidence (unreleased)
+## Shared limits and hosted evidence
 
 Supply `sharedRuntime` to `createActionProtection` and `limits` on each applicable
 action. The configured runtime must support schema-2 action reports. This is not
