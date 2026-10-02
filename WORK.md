@@ -1,8 +1,8 @@
-# Bounded tool work (Alpha, unreleased)
+# Bounded tool work (Alpha)
 
 The Node action and MCP APIs support optional weighted tool-work reservations.
-This development feature requires the `/api/v1/sdk/ai-abuse/work` runtime endpoint
-enabled on the hosted runtime; published alpha.4 does not include it. Go/Python model budgets
+Available in `@webdecoy/ai-protection@0.1.0-alpha.5`. Requires the
+`/api/v1/sdk/ai-abuse/work` contract enabled on the hosted runtime. Go/Python model budgets
 and invocation controls remain available, but do not expose this new weighted
 operation API. The first integration is the TypeScript MCP tools adapter.
 
