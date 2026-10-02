@@ -328,3 +328,9 @@ and maps tenant membership. The [MCP adapter](MCP.md) provides a separate `/mcp`
 HTTP tool dispatch starting in `0.1.0-alpha.4`.
 It requires the optional, pinned MCP SDK peer. Optional shared quotas, concurrency and hosted
 action events are documented in the action guide and use the hosted AI Protection runtime and dashboard.
+
+## Weighted tool work (Alpha)
+
+Node alpha.5 adds weighted tool-work reservations and tenant concurrency. See
+[bounded tool work](WORK.md) for installation, enforced application bounds and
+retry/unknown-outcome semantics. These units are separate from model usage and billing.
