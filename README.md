@@ -325,6 +325,6 @@ Version `0.1.0-alpha.3` includes an action boundary at `@webdecoy/ai-protection/
 This API requires your server authentication and application authorization.
 An [Auth0 access-token example](examples/auth0/README.md) verifies signed tokens
 and maps tenant membership. The [MCP adapter](MCP.md) provides a separate `/mcp` entrypoint for stateless
-HTTP tool dispatch on the development branch (not in published alpha.3).
+HTTP tool dispatch starting in `0.1.0-alpha.4`.
 It requires the optional, pinned MCP SDK peer. Optional shared quotas, concurrency and hosted
 action events are documented in the action guide and use the hosted AI Protection runtime and dashboard.

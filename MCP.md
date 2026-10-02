@@ -1,4 +1,4 @@
-# MCP tool protection (Alpha, unreleased)
+# MCP tool protection (Alpha)
 
 `@webdecoy/ai-protection/mcp` is a Node HTTP handler for a closed registry of
 protected tools. It runs in your application's backend. Your MCP traffic stays
@@ -8,24 +8,11 @@ resource authorization.
 
 ## Install
 
-This entrypoint is on the development branch and is **not included in npm
-0.1.0-alpha.3**. To evaluate this source, pack it from the repository root:
+Available in `0.1.0-alpha.4` and later compatible alpha releases:
 
 ```sh
-npm ci
-npm pack --ignore-scripts
+npm install @webdecoy/ai-protection@0.1.0-alpha.4 @modelcontextprotocol/sdk@1.31.0
 ```
-
-Then install that local artifact in your application's directory:
-
-```sh
-npm install /absolute/path/to/webdecoy-ai-protection-0.1.0-alpha.3.tgz \
-  @modelcontextprotocol/sdk@1.31.0
-```
-
-The local artifact has the source manifest's version; it is not the registry's
-published alpha.3 artifact. Pin its path/checksum for evaluation. A subsequent
-release will provide a distinct version before registry publication.
 
 Requires Node 22.22.3+ and MCP SDK **1.31.0**. The MCP SDK is an optional peer, so
 ordinary request/action SDK installs do not install it. Only `/mcp` imports it.
