@@ -1,3 +1,4 @@
+import {prepareWork} from './work.mjs';
 import {prepareQuota,quotaHash} from './quota.mjs';
 import {prepareConcurrency} from './concurrency.mjs';
 import {validPropertyID} from './account.mjs';
@@ -20,10 +21,15 @@ export function prepareActionRuntime(options, definitions) {
       const gate=prepareQuota({...c,accountQuota:{...q,idempotency:false,operationId:undefined,sessionLimit:0,subject:ctx=>subject(ctx,tenant)}});
       gates.push(async(ctx,signal)=>{const r=await gate(ctx,signal);if(r.check)r.check.id=tenant?'tenant_quota':'caller_quota';return r;});
     }
-    let concurrency=null;
-    if(l.concurrency){if(ruleIDs.has(l.concurrency.ruleId))throw Error('Action limits require distinct rule IDs');ruleIDs.add(l.concurrency.ruleId);
-      concurrency=prepareConcurrency({...c,concurrency:{...l.concurrency,subject:ctx=>subject(ctx,false)}});}
-    limits.set(name,{gates,concurrency});
+    const concurrencies=[];
+    for(const [key,tenant] of [['concurrency',false],['tenantConcurrency',true]])if(l[key]){
+      const option=l[key];if(ruleIDs.has(option.ruleId))throw Error('Action limits require distinct rule IDs');ruleIDs.add(option.ruleId);
+      const gate=prepareConcurrency({...c,concurrency:{...option,subject:ctx=>subject(ctx,tenant)}});
+      concurrencies.push(async(ctx,signal)=>{const r=await gate(ctx,signal);if(tenant)r.check.id='tenant_concurrency';return r;});
+    }
+    let work=null;
+    if(l.work){if(ruleIDs.has(l.work.ruleId))throw Error('Action limits require distinct rule IDs');ruleIDs.add(l.work.ruleId);work=prepareWork(c,l.work,name,options.policyVersion);}
+    limits.set(name,{gates,concurrencies,work});
   }
   const reporter=createReporter({reportingTimeoutMs:c.reportingTimeoutMs??1000,maxPendingReports:c.maxPendingReports??100,
     onObservation:async(event,{signal})=>{
@@ -32,7 +38,7 @@ export function prepareActionRuntime(options, definitions) {
       const payload={schema:2,request_id:event.eventId,timestamp:event.timestamp,decision:event.decision,reason:event.reason,
         degraded:event.checks.some(c=>c.decision==='unavailable'),checks,handler_attempted:event.attempted,
         action:event.decision==='deny'?'denied':event.outcome==='unknown'?'handler_error':'forwarded',
-        tool_action:{action_id:event.actionId,name:event.action,policy_version:event.policyVersion,outcome:event.outcome}};
+        tool_action:{action_id:event.actionId,name:event.action,policy_version:event.policyVersion,outcome:event.outcome,...(event.work?{work:event.work}:{})}};
       const response=await fetch(new URL('/api/v1/sdk/ai-abuse/reports',url),{method:'POST',redirect:'error',signal,
         headers:{Authorization:`Bearer ${c.webdecoyKey}`,'X-WebDecoy-Property-ID':c.propertyId,'Content-Type':'application/json'},body:JSON.stringify(payload)});
       await response.body?.cancel();if(!response.ok)throw Error('Action reporting unavailable');

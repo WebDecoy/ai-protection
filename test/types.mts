@@ -47,3 +47,10 @@ const actions = createActionProtection({policyVersion:'v1',authenticate:(_sessio
 void actions.run('read',{id:'r'},'server-session');
 // @ts-expect-error Authentication context must match the server verifier.
 void actions.run('read',{},123);
+
+const weightedActions=createActionProtection({policyVersion:'weighted_v1',authenticate:()=>actionCaller,
+ sharedRuntime:{webdecoyUrl:'https://example.test',webdecoyKey:'fixture',propertyId:'11111111-1111-4111-8111-111111111111',subjectSecret:'x'.repeat(32)},
+ actions:{search:{requiredScopes:[],validate:()=>true,authorize:()=>true,
+ limits:{work:{ruleId:'search_work',maxUnits:11,windowSeconds:60,limits:{caller:22,tenant:44,tool:88},measure:result=>typeof result==='number'?result:11},tenantConcurrency:{ruleId:'tenant_search',accountLimit:2,featureLimit:10}},
+ execute:({work})=>work!.maxUnits}}});
+void weightedActions.run('search',{},null);

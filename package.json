@@ -60,7 +60,9 @@
     "action-runtime.mjs",
     "mcp.mjs",
     "mcp.d.mts",
-    "MCP.md"
+    "MCP.md",
+    "work.mjs",
+    "WORK.md"
   ],
   "description": "Bot and abuse protection for AI-powered applications. Server-side request admission for Node.js.",
   "license": "Apache-2.0",

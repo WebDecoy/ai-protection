@@ -111,9 +111,12 @@ have unknown work. Never retry writes without application/provider idempotency.
   405. Reconnects do not grant fresh identity allowances.
 - Resources, prompts, tasks, sampling, elicitation, other routes and pre-existing
   MCP handlers are not wrapped. Unregistered methods/tools do not dispatch.
-  Weighted operation budgets and complete cross-replica lifecycle acceptance
-  remain separate work.
+  Weighted tool work is available in the development API; see [bounded work](WORK.md)
+  for its runtime prerequisite and application-enforced bounds. Full product
+  acceptance remains separate from this adapter's tested contract.
 
 This is an explicit tools integration, not transparent protection of an existing
 whole MCP server. See the [MCP transport specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)
 and [authorization specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization).
+
+For weighted search/export limits and tenant concurrency, see [bounded tool work](WORK.md).

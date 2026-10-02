@@ -7,7 +7,7 @@ const root = new URL('..', import.meta.url);
 const dir = mkdtempSync(join(tmpdir(), 'webdecoy-ai-package-'));
 try {
   const [pack] = JSON.parse(execFileSync('npm', ['pack','--dry-run=false','--json','--ignore-scripts','--pack-destination',dir], {cwd:root,encoding:'utf8'}));
-  const expected = ['mcp.mjs','mcp.d.mts','MCP.md','action-runtime.mjs','actions.mjs','actions.d.mts','ARCHITECTURE.md','NOTICE','LICENSE','NEXTJS.md','README.md','account.mjs','admission.mjs','fetch.d.mts','fetch.mjs','observation.mjs','package.json','rules.mjs','reporting.mjs','telemetry.mjs','quota.mjs','concurrency.mjs','budget.mjs','browser.mjs','browser.d.mts','browser-evidence.mjs','usage.mjs','transport.mjs'];
+  const expected = ['WORK.md','work.mjs','mcp.mjs','mcp.d.mts','MCP.md','action-runtime.mjs','actions.mjs','actions.d.mts','ARCHITECTURE.md','NOTICE','LICENSE','NEXTJS.md','README.md','account.mjs','admission.mjs','fetch.d.mts','fetch.mjs','observation.mjs','package.json','rules.mjs','reporting.mjs','telemetry.mjs','quota.mjs','concurrency.mjs','budget.mjs','browser.mjs','browser.d.mts','browser-evidence.mjs','usage.mjs','transport.mjs'];
   assert.deepEqual(pack.files.map(f=>f.path).sort(),expected.sort(), 'Unexpected package contents');
   const manifest=JSON.parse(execFileSync('tar',['-xOf',join(dir,pack.filename),'package/package.json'],{encoding:'utf8'}));
   assert.notEqual(manifest.private,true,'Release must be publishable');
