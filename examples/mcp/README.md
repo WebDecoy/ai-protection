@@ -1,15 +1,18 @@
 # Protected MCP tools — TypeScript source integration
 
 A runnable customer-server integration using MCP SDK **1.31.0**, protocol
-**2025-11-25**, and the source-only WebDecoy action boundary. No hosted proxy,
+**2025-11-25**, and the WebDecoy `/mcp` package entrypoint. No hosted proxy,
 WebDecoy API key, model calls, or paid inference is required for the fixture.
-The SDK dependencies live in this example, not the core npm package.
+The MCP SDK is an optional peer; core-only installs do not pull it in.
+This repository example links the root SDK with `file:../..`. Published alpha.3
+does not contain `/mcp`; see the [package installation guide](../../MCP.md).
 
 ## Run the integration tests
 
 From the SDK repository root:
 
 ```sh
+npm ci
 npm ci --prefix examples/auth0
 npm ci --prefix examples/mcp
 npm test --prefix examples/mcp
@@ -86,12 +89,13 @@ Permission errors never become allowed because cloud detection is unavailable.
   work holds its active slot until it settles. Re-check ownership in the actual
   database transaction and use provider idempotency for writes.
 
-The wrapper is not yet an exported `/mcp` package entrypoint. Optional `sharedRuntime` enables caller/tenant quotas, concurrency and hosted
+The example re-exports `@webdecoy/ai-protection/mcp`; there is no separate copy of
+the transport wrapper. Optional `sharedRuntime` enables caller/tenant quotas, concurrency and hosted
 action events through the underlying [action configuration](../actions/README.md#shared-limits-and-hosted-evidence).
 Weighted work reservations and session/resumption support remain follow-ups.
-Installing npm `0.1.0-alpha.3` provides the action API. The MCP wrapper remains a
-source example that must be integrated into your server; dashboard enforcement
-does not install it.
+Installing npm `0.1.0-alpha.3` provides the action API only. The new MCP entrypoint
+is not published yet. Integrating either API requires application code; dashboard
+enforcement does not install it.
 
 References: [MCP authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization),
 [Streamable HTTP](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports),
