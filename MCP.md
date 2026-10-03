@@ -11,7 +11,7 @@ resource authorization.
 Available in `0.1.0-alpha.5` and later compatible alpha releases:
 
 ```sh
-npm install @webdecoy/ai-protection@0.1.0-alpha.8 @modelcontextprotocol/sdk@1.31.0
+npm install @webdecoy/ai-protection@0.1.0-alpha.9 @modelcontextprotocol/sdk@1.31.0
 ```
 
 Requires Node 22.22.3+ and MCP SDK **1.31.0**. The MCP SDK is an optional peer, so
@@ -190,3 +190,49 @@ without changing admission. The action API also supports optional `toolSchema:
 {serverId, hash}` on trusted registered definitions; it is snapshotted and validated,
 never read from tool arguments. This is SDK-reported metadata, not authorization
 or independent verification of a schema.
+
+
+### Advisory side effects (alpha.9+)
+
+With discovery enabled, the SDK adds a fixed classification and reason code to
+catalog/call metadata: `unknown`, `read_only`, `mutating`, or `destructive`.
+This is heuristic inference, not a prompt scanner, authorization policy, verified
+behavior or proof that side effects occurred. Classification never allows or
+blocks a request. Existing validate/authorize/scopes/limits still control dispatch.
+
+You may supply MCP boolean hints on a protected tool:
+
+```ts
+annotations: { readOnlyHint: true, destructiveHint: false },
+```
+
+Supported annotations are readOnlyHint, destructiveHint, idempotentHint and
+openWorldHint. The adapter snapshots those booleans and includes them in scoped
+MCP listing responses. Only classification codes enter WebDecoy reports; raw
+annotations, schemas and descriptions are not uploaded. The schema fingerprint
+continues to cover inputSchema, not annotations or implementation code.
+
+The classifier checks tokenized tool names and explicit top-level `action`,
+`operation` or `method` selectors (`const`/up to 64 enum values). It does not
+resolve schema references, scan arbitrary text/arguments, execute tools, or call a
+model. Destructive/mutating signals take precedence over a contradictory read-only
+hint and are labeled conflicting. With no useful signals it reports unknown.
+Name heuristics can be wrong (for example, a status tool named after deletion).
+As the [MCP specification](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)
+requires, annotations must not be treated as guarantees from an untrusted server.
+
+The dashboard shows inferred evidence separately from a customer classification.
+Use **Review classification** to select a label or return to SDK inference.
+Overrides are property/server/tool settings bound to the current input-schema
+hash; a different hash falls back to inference and prompts review. Changes to
+annotations or implementation without a schema change do not invalidate an
+override, so review those changes yourself. A saved classification changes only
+the dashboard label; it is not read by runtime enforcement. Overrides persist as
+customer settings until reset or property deletion; SDK evidence retains its
+seven-day window. Where evidence disagrees for the latest received schema, the
+review order is destructive, mutating, unknown, then read-only. Older SDKs without
+classification metadata remain unknown, though customers can label their tools.
+
+Requires a runtime accepting optional `effect` evidence. Deploy it before
+upgrading a discovery-enabled integration. Large registries are split into
+bounded catalog batches so added metadata stays within report body limits.

@@ -8,13 +8,13 @@ import {generateKeyPair,exportJWK,SignJWT} from 'jose';
 import {createAuth0Authenticator} from '../../auth0/authenticate.mjs';
 const keys=await generateKeyPair('RS256');const jwk={...await exportJWK(keys.publicKey),kid:'fixture',alg:'RS256',use:'sig'};
 const issuer='https://fixture.auth0.com/';
-async function fixture(t,{blocked=false,sharedRuntime,discovery,inputSchema}={}){
+async function fixture(t,{blocked=false,sharedRuntime,discovery,inputSchema,annotations,registry}={}){
  let handler;const http=createServer((req,res)=>{void handler(req,res);});
  await new Promise(r=>http.listen(0,'127.0.0.1',r));const resource=`http://127.0.0.1:${http.address().port}/mcp`;
  let reads=0,exports=0,cancelled=0;const events=[];let started;const startedPromise=new Promise(r=>started=r);
  const authenticate=createAuth0Authenticator({issuer,audience:resource,fetcher:async()=>Response.json({keys:[jwk]}),resolveTenant:({organizationId})=>organizationId==='org_a'?'a':organizationId==='org_b'?'b':null});
- handler=createProtectedMCPHandler({sharedRuntime,discovery,resource,authorizationServer:issuer,authenticate,policyVersion:'records_v1',onEvent:e=>events.push(e),tools:{
-  'records.read':{description:'Read an owned record',inputSchema:inputSchema??{type:'object',properties:{id:{type:'string'}},required:['id'],additionalProperties:false},requiredScopes:['records:read'],validate:args=>Object.keys(args).length===1&&typeof args.id==='string',authorize:({caller,args})=>caller.tenant===args.id,execute:async({signal})=>{reads++;started();if(blocked)await new Promise((_,reject)=>{if(signal.aborted){cancelled++;reject(signal.reason);}else signal.addEventListener('abort',()=>{cancelled++;reject(signal.reason);},{once:true});});return {content:[{type:'text',text:'owned record'}]};}},
+ handler=createProtectedMCPHandler({sharedRuntime,discovery,resource,authorizationServer:issuer,authenticate,policyVersion:'records_v1',onEvent:e=>events.push(e),tools:registry??{
+  'records.read':{annotations,description:'Read an owned record',inputSchema:inputSchema??{type:'object',properties:{id:{type:'string'}},required:['id'],additionalProperties:false},requiredScopes:['records:read'],validate:args=>Object.keys(args).length===1&&typeof args.id==='string',authorize:({caller,args})=>caller.tenant===args.id,execute:async({signal})=>{reads++;started();if(blocked)await new Promise((_,reject)=>{if(signal.aborted){cancelled++;reject(signal.reason);}else signal.addEventListener('abort',()=>{cancelled++;reject(signal.reason);},{once:true});});return {content:[{type:'text',text:'owned record'}]};}},
   'records.export':{description:'Export records',inputSchema:{type:'object'},requiredScopes:['records:export'],validate:()=>true,authorize:()=>false,execute:()=>{exports++;return {content:[]};}},
  }});
  t.after(()=>{http.closeAllConnections();return new Promise(r=>http.close(r));});
@@ -72,7 +72,7 @@ test('opt-in discovery reports only advertised names and hashes, before any exec
  assert.deepEqual(Object.keys(r).sort(),['action','request_id','schema','timestamp','tool_catalog']);
  assert.deepEqual(Object.keys(r.tool_catalog).sort(),['server_id','source','tools']);
  assert.equal(r.tool_catalog.server_id,'records');assert.equal(r.tool_catalog.source,'tools_list');
- assert.equal(r.tool_catalog.tools.length,1);assert.deepEqual(Object.keys(r.tool_catalog.tools[0]).sort(),['name','schema_hash']);
+ assert.equal(r.tool_catalog.tools.length,1);assert.deepEqual(Object.keys(r.tool_catalog.tools[0]).sort(),['effect','name','schema_hash']);
  assert.match(r.tool_catalog.tools[0].schema_hash,/^[a-f0-9]{64}$/);
  const raw=JSON.stringify(r);for(const secret of ['reader','org_a','owned record','inputSchema','description','requiredScopes','test-key'])assert.equal(raw.includes(secret),false);
  const denied=await f.post({jsonrpc:'2.0',id:2,method:'tools/list',params:{}},{bearer:null});assert.equal(denied.status,401);await f.flush();assert.equal(sink.reports.length,1);
@@ -119,4 +119,24 @@ test('MCP action schema evidence stays off without discovery',async t=>{
  const sink=await reportingFixture(t);const f=await fixture(t,{sharedRuntime:sink.sharedRuntime});
  await result(await f.post(call('records.read')));await awaitReports(sink,2);
  for(const r of sink.reports)assert.equal(r.tool_action.tool_schema,undefined);
+});
+
+
+test('MCP hints round-trip while hosted evidence stays advisory and sanitized',async t=>{
+ const sink=await reportingFixture(t);const f=await fixture(t,{sharedRuntime:sink.sharedRuntime,discovery:{serverId:'records'},annotations:{readOnlyHint:true,title:'private-title'}});
+ const listed=await result(await f.post({jsonrpc:'2.0',id:1,method:'tools/list',params:{}}));await f.flush();
+ assert.deepEqual(listed.result.tools[0].annotations,{readOnlyHint:true});
+ assert.deepEqual(sink.reports[0].tool_catalog.tools[0].effect,{schema:1,level:'read_only',reason:'annotation_read_only'});
+ await result(await f.post(call('records.read')));await awaitReports(sink,3);
+ assert.equal(f.counts().reads,1);
+ for(const r of sink.reports.filter(r=>r.schema===2))assert.deepEqual(r.tool_action.tool_schema.effect,{schema:1,level:'read_only',reason:'annotation_read_only'});
+ assert.ok(!JSON.stringify(sink.reports).includes('private-title'));
+});
+test('maximum registry advertisements stay within runtime body bounds',async t=>{
+ const sink=await reportingFixture(t);
+ const registry=Object.fromEntries(Array.from({length:128},(_,i)=>['t'+String(i).padStart(3,'0')+'x'.repeat(92),{description:'test',inputSchema:{type:'object'},annotations:{destructiveHint:true},requiredScopes:[],validate:()=>true,authorize:()=>true,execute:()=>({content:[]})}]));
+ const f=await fixture(t,{sharedRuntime:sink.sharedRuntime,discovery:{serverId:'s'.repeat(96)},registry});
+ const listed=await result(await f.post({jsonrpc:'2.0',id:1,method:'tools/list',params:{}}));assert.equal(listed.result.tools.length,128);await f.flush();
+ assert.equal(sink.reports.flatMap(r=>r.tool_catalog.tools).length,128);
+ for(const r of sink.reports){assert.ok(Buffer.byteLength(JSON.stringify(r))<=32768);assert.equal(r.tool_catalog.tools[0].effect.level,'destructive');}
 });

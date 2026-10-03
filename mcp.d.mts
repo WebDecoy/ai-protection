@@ -7,6 +7,8 @@ import type {ActionContext, ActionDefinition, ActionEvent, ActionRuntime, Truste
 export interface ProtectedTool extends Omit<ActionDefinition, 'toolSchema'> {
   description: string;
   inputSchema: Tool['inputSchema'];
+  /** Behavioral hints, never authorization or verified guarantees. */
+  annotations?: Pick<NonNullable<Tool['annotations']>, 'readOnlyHint' | 'destructiveHint' | 'idempotentHint' | 'openWorldHint'>;
   /** Await all protected work and return a complete MCP result, never a detached stream. */
   execute(context: ActionContext): CallToolResult | Promise<CallToolResult>;
 }
