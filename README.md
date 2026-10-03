@@ -334,3 +334,29 @@ action events are documented in the action guide and use the hosted AI Protectio
 Node alpha.5 adds weighted tool-work reservations and tenant concurrency. See
 [bounded tool work](WORK.md) for installation, enforced application bounds and
 retry/unknown-outcome semantics. These units are separate from model usage and billing.
+
+### Opt-in tool caller attribution
+
+With a runtime supporting caller evidence, set `sharedRuntime.reportCaller: true`
+on `createActionProtection`. It defaults to false. Hosted reports and `onEvent`
+then include `caller: {schema: 1, source: 'application_auth', id: '<digest>'}`
+after successful authentication, including subsequent permission denials.
+Failed authentication, rejected arguments before authentication, and unknown tools
+have no caller attribution. Existing request admission reporting is unchanged.
+
+The SDK derives this HMAC-SHA256 pseudonym from the server-owned `subjectSecret`,
+a dedicated versioned domain, property ID, issuer, application tenant and subject.
+Replicas must use the same secret to correlate callers. Raw subjects, issuers,
+tenants, scopes, tokens and tool arguments are not added to reports. OAuth clients
+and agent signers are not treated as the authenticated subject. Your authentication
+hook must verify credentials and tenant membership; WebDecoy does not independently
+verify those credentials from this report, and a pseudonym is not a unique person.
+
+Use a randomly generated secret of at least 32 bytes and store it server-side.
+Rotating it changes pseudonyms and also changes existing shared-limit identities
+that use this secret; coordinate rotation because it can reset quota continuity.
+Historical pseudonyms are not relinked. AI Protection displays a seven-day receipt
+window and existing report retention purges expired records in bounded background
+sweeps. Counts cover reported, consistently attributed actions only; dropped reports,
+older SDKs and conflicting bindings leave gaps. Install server support before
+enabling this option: older runtimes reject the additional field.

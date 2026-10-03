@@ -3,7 +3,7 @@ import {abortable} from './transport.mjs';
 import {prepareActionRuntime} from './action-runtime.mjs';
 
 const token = /^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,95}$/;
-const bounded = value => typeof value === 'string' && value.length > 0 && value.length <= 512 && !/[\x00-\x1f\x7f]/.test(value);
+const bounded = value => typeof value === 'string' && value.isWellFormed() && value.length > 0 && value.length <= 512 && !/[\x00-\x1f\x7f]/.test(value);
 const freeze = value => {
   if (value && typeof value === 'object') { for (const child of Object.values(value)) freeze(child); Object.freeze(value); }
   return value;
@@ -81,7 +81,7 @@ export function createActionProtection(options) {
     const actionId = randomUUID();
     // Unknown caller-controlled action strings are never placed in evidence.
     const action = actions.get(name), eventAction = action ? name : 'unregistered';
-    let attempted = false,completed=false,lease,work;
+    let attempted = false,completed=false,lease,work,callerEvidence;
     const leases=[];
     const checks=[];
     const deadline = new AbortController();
@@ -91,7 +91,7 @@ export function createActionProtection(options) {
     function emit(decision, reason, outcome) {
 
       const event = Object.freeze({schema:1, eventId:randomUUID(), timestamp:new Date().toISOString(), actionId, action:eventAction, policyVersion,
-        evaluation:'local', decision, reason, attempted, outcome,...(work?{work:Object.freeze({...work.evidence})}:{}),checks:Object.freeze(checks.map(c=>Object.freeze({...c})))});
+        ...(callerEvidence?{caller:callerEvidence}:{}),evaluation:'local', decision, reason, attempted, outcome,...(work?{work:Object.freeze({...work.evidence})}:{}),checks:Object.freeze(checks.map(c=>Object.freeze({...c})))});
       if(runtime)void runtime.report(event);
       if(!sink||pendingEvents>=100)return;
       pendingEvents++;
@@ -107,6 +107,7 @@ export function createActionProtection(options) {
       let caller;
       try { caller = callerSnapshot(await evaluate(() => authenticate(authenticationContext, {signal:admissionSignal}))); }
       catch { cancelled(); deny('authentication_required',401); }
+      callerEvidence=runtime?.callerEvidence(caller);
       cancelled();
       if (action.requiredScopes.some(scope => !caller.scopes.includes(scope))) deny('missing_scope',403);
       const context = Object.freeze({caller, args, signal:admissionSignal});
