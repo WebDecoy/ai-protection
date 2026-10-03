@@ -45,7 +45,7 @@ export function createAdmission(options) {
       let verdict;
       try {
         const response = await fetch(new URL('/api/v1/sdk/detect', c.webdecoyUrl), {
-          method: 'POST', redirect: 'error',
+          method: 'POST', redirect: 'manual',
           headers: {'Authorization': `Bearer ${c.webdecoyKey}`, 'Content-Type': 'application/json'},
           signal: AbortSignal.any([signal, AbortSignal.timeout(c.detectorTimeoutMs)]),
           body: JSON.stringify({
