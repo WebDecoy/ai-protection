@@ -1,4 +1,4 @@
-import {createWorkerAIProtection} from '../../workers.mjs';
+import {createWorkerAIProtection} from '@webdecoy/ai-protection/workers';
 
 export default {
   async fetch(request, env, ctx) {

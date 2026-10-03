@@ -26,6 +26,8 @@ try {
   execFileSync(process.execPath,['--input-type=module','-e',
     "import {createWorkerAIProtection} from '@webdecoy/ai-protection/workers'; if(typeof createWorkerAIProtection!=='function')throw Error('Missing Workers export'); import {createActionProtection} from '@webdecoy/ai-protection/actions'; if(typeof createActionProtection!=='function')throw Error('Missing actions export'); import {prepareBrowserEvidence} from '@webdecoy/ai-protection/browser'; if(typeof prepareBrowserEvidence!=='function')throw Error('Missing browser export'); import {createAIProtection as root} from '@webdecoy/ai-protection'; import {createAIProtection as subpath} from '@webdecoy/ai-protection/fetch'; if(typeof root!=='function'||root!==subpath)throw Error('Invalid exports');"],{cwd:consumer,stdio:'pipe'});
   console.log(`Verified ${pack.filename}: exact file allowlist and isolated consumer imports.`);
+  process.stdout.write(execFileSync(process.execPath, ['--test',new URL('../test/workers/runtime.test.mjs',import.meta.url).pathname], {cwd:consumer,env:{...process.env,WEBDECOY_WORKERS_PACKAGE_DIR:join(consumer,'node_modules/@webdecoy/ai-protection')},encoding:'utf8'}));
+  console.log('Verified packed Workers adapter in workerd.');
   // Test the tarball's transport using a real MCP client, without repository imports.
   execFileSync('npm',['install','--ignore-scripts','--no-audit','--no-fund','@modelcontextprotocol/sdk@1.31.0','jose@6.2.12','@types/node@22.19.15'],{cwd:consumer,stdio:'pipe'});
   writeFileSync(join(consumer,'authenticate.mjs'),readFileSync(new URL('../examples/auth0/authenticate.mjs',import.meta.url)));

@@ -4,7 +4,7 @@ Bot and abuse protection for AI-powered applications. A small Node.js SDK that
 checks requests before your application invokes a model. Customer-defined rules run
 locally; proprietary bot detection runs in WebDecoy. See [architecture](ARCHITECTURE.md).
 
-**Alpha release: `0.1.0-alpha.11`.** Integration mechanics are tested;
+**Alpha release: `0.1.0-alpha.12`.** Integration mechanics are tested;
 real-world detection accuracy and provider cost savings have not been established.
 Requires a WebDecoy property, a property-scoped API key, and a compatible WebDecoy
 service deployment. This repository contains the SDK, not the detection service.

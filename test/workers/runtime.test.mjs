@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {build} from 'esbuild';
 import {Miniflare, Response} from 'miniflare';
 
-const bundle = await build({entryPoints:[new URL('./fixture.mjs',import.meta.url).pathname],bundle:true,write:false,format:'esm',platform:'neutral',external:['node:*']});
+const bundle = await build({entryPoints:[new URL('./fixture.mjs',import.meta.url).pathname],bundle:true,write:false,format:'esm',platform:'neutral',external:['node:*'], alias:process.env.WEBDECOY_WORKERS_PACKAGE_DIR ? {'@webdecoy/ai-protection/workers':process.env.WEBDECOY_WORKERS_PACKAGE_DIR+'/workers.mjs'} : {}});
 async function fixture(t, overrides={}) {
   const state={decision:'allow',detectorStatus:200,reports:[],configCalls:0,detectCalls:0,quotaCalls:[],quotaAllowed:true,redirects:0,outboundErrors:[],...overrides};
   const mf=new Miniflare({modules:true,script:bundle.outputFiles[0].text,compatibilityDate:'2026-01-01',compatibilityFlags:['nodejs_compat'],
