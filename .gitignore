@@ -7,3 +7,7 @@ coverage/
 .DS_Store
 
 examples/mcp/dist/
+
+.dev.vars
+.dev.vars.*
+.wrangler/

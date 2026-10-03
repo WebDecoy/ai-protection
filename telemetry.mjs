@@ -11,7 +11,7 @@ export function createTelemetry({webdecoyUrl, webdecoyKey, propertyId, reportToW
       ...(event.handler_status !== undefined ? {handler_status:event.handler_status} : {}),
       action:event.action};
     const response = await fetch(new URL('/api/v1/sdk/ai-abuse/reports',webdecoyUrl),{
-      method:'POST',redirect:'error',signal,
+      method:'POST',redirect:'manual',signal,
       headers:{Authorization:`Bearer ${webdecoyKey}`,'Content-Type':'application/json','X-WebDecoy-Property-ID':propertyId},
       body:JSON.stringify(payload)
     });

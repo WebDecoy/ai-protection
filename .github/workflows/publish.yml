@@ -25,6 +25,7 @@ jobs:
         run: node --input-type=module -e "import p from './package.json' with {type:'json'}; if(process.env.RELEASE_TAG!=='v'+p.version || !/^\d+\.\d+\.\d+-alpha\.\d+$/.test(p.version))throw Error('Expected matching alpha version tag');"
       - run: npm ci
       - run: npm test
+      - run: npm run test:workers
       - run: npm run test:types
       - run: npm run check:package
       - run: npm ci && npm run build -- --webpack && npm test
