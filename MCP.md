@@ -11,7 +11,7 @@ resource authorization.
 Available in `0.1.0-alpha.5` and later compatible alpha releases:
 
 ```sh
-npm install @webdecoy/ai-protection@0.1.0-alpha.5 @modelcontextprotocol/sdk@1.31.0
+npm install @webdecoy/ai-protection@0.1.0-alpha.7 @modelcontextprotocol/sdk@1.31.0
 ```
 
 Requires Node 22.22.3+ and MCP SDK **1.31.0**. The MCP SDK is an optional peer, so
@@ -120,3 +120,47 @@ whole MCP server. See the [MCP transport specification](https://modelcontextprot
 and [authorization specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization).
 
 For weighted search/export limits and tenant concurrency, see [bounded tool work](WORK.md).
+
+
+## Opt-in tool discovery (alpha.7+)
+
+Add these options alongside your existing `tools` and authentication configuration:
+
+```ts
+sharedRuntime: {
+  webdecoyUrl: 'https://ai-protection.webdecoy.com',
+  webdecoyKey: process.env.WEBDECOY_API_KEY!,
+  propertyId: process.env.WEBDECOY_PROPERTY_ID!,
+  subjectSecret: process.env.WEBDECOY_SUBJECT_SECRET!, // at least 32 bytes
+},
+discovery: { serverId: 'records-api' },
+```
+
+Use a stable, non-secret server label (1–96 letters, digits, `_`, `.`, `:`, `-`,
+starting with a letter or digit). Reuse it across replicas/releases of the same
+logical server. Give separate servers separate labels within a property. Do not
+include tenant IDs, hostnames containing secrets, or customer information.
+
+An authenticated MCP client calls `tools/list`. Each nonempty response queues a
+best-effort advertisement of the visible tool names and SHA-256 input-schema
+hashes. The AI Protection dashboard shows **Advertised MCP tools**, including
+tools that have never executed. This does not scan unwrapped servers, hidden tools,
+resources, prompts or alternate routes. No network request is made at handler
+construction. Discovery is off unless configured and requires sharedRuntime.
+
+Hashes cover the JSON input schema with recursively sorted object keys; array
+order is preserved. Raw schemas, descriptions, arguments, results, credentials,
+caller identities and required scopes are not uploaded. A schema hash is a
+fingerprint, not encryption; someone with a candidate schema can compare it.
+Multiple hashes for one server/tool show reported variants in the seven-day
+receipt window. Rolling deployments and benign schema edits can cause variants.
+They do not establish an attack, breaking change, removal or missing permission.
+The UI uses the latest receipt's hash, not a claim about deployment order.
+
+Discovery uses schema-3 reports on the existing reporting endpoint; deploy a
+compatible hosted runtime first. Old runtimes reject these optional reports
+without affecting tool listing. Reporting has bounded pending work and a deadline,
+never blocks authorization, and does not retry. Call `await handler.flush()` at a
+host shutdown/lifecycle boundary to drain pending discovery reports; it does not
+wait for active tool calls or action reports. Abruptly terminated hosts can lose
+reports. Discovery advertisements never increment tool action or request counts.

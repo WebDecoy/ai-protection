@@ -14,8 +14,12 @@ const options: ProtectedMCPOptions = {
     return {schema:1,subject:'user',tenant:'trusted',issuer:'https://issuer.test/',authenticationMethod:'oauth',expiresAt:Date.now()+60000,scopes:['read']};
   },
   tools:{read},
+  discovery:{serverId:"records"},
+  sharedRuntime:{webdecoyUrl:'https://ai-protection.webdecoy.com',webdecoyKey:'server-only',propertyId:'11111111-1111-4111-8111-111111111111',subjectSecret:'a'.repeat(32)},
 };
-createServer(createProtectedMCPHandler(options));
+const handler=createProtectedMCPHandler(options);
+createServer(handler);
+void handler.flush();
 // @ts-expect-error Tool callbacks must return a complete MCP result.
 const bad: ProtectedTool = {...read,execute:()=>new Response('not an MCP result')};
 // @ts-expect-error Unverified token text is not a trusted caller.
