@@ -11,7 +11,7 @@ resource authorization.
 Available in `0.1.0-alpha.5` and later compatible alpha releases:
 
 ```sh
-npm install @webdecoy/ai-protection@0.1.0-alpha.7 @modelcontextprotocol/sdk@1.31.0
+npm install @webdecoy/ai-protection@0.1.0-alpha.8 @modelcontextprotocol/sdk@1.31.0
 ```
 
 Requires Node 22.22.3+ and MCP SDK **1.31.0**. The MCP SDK is an optional peer, so
@@ -143,7 +143,7 @@ include tenant IDs, hostnames containing secrets, or customer information.
 
 An authenticated MCP client calls `tools/list`. Each nonempty response queues a
 best-effort advertisement of the visible tool names and SHA-256 input-schema
-hashes. The AI Protection dashboard shows **Advertised MCP tools**, including
+hashes. The AI Protection dashboard shows **MCP tool inventory**, including
 tools that have never executed. This does not scan unwrapped servers, hidden tools,
 resources, prompts or alternate routes. No network request is made at handler
 construction. Discovery is off unless configured and requires sharedRuntime.
@@ -164,3 +164,29 @@ never blocks authorization, and does not retry. Call `await handler.flush()` at 
 host shutdown/lifecycle boundary to drain pending discovery reports; it does not
 wait for active tool calls or action reports. Abruptly terminated hosts can lose
 reports. Discovery advertisements never increment tool action or request counts.
+
+
+### Calls before discovery (alpha.8+)
+
+With `discovery` enabled, the adapter also attaches the registered server label
+and schema fingerprint to each `tools/call` action report. This includes local
+permission/scope denials for registered tools. It works before a client calls
+`tools/list`; no listing round trip is required to execute an authorized tool.
+Unknown tool names and requests rejected before authentication do not gain
+registry metadata. Turning discovery off omits the new call metadata too.
+
+The inventory combines advertisements and action evidence by property, server
+label and tool name. Attempt/start/completion reports sharing an action ID count
+once. Counts include denied attempts, so they are not successful-execution totals.
+“Call evidence only” means no advertisement was captured in the bounded seven-day
+sample. Clients can call directly; hidden scopes, sampling and missing telemetry
+also limit coverage. This is not an attack or permission-gap verdict. Older action
+reports without metadata still appear in the general activity table, aggregated
+by tool name across servers; their server/schema association remains unknown.
+
+Deploy a runtime accepting optional `tool_action.tool_schema` before upgrading an
+integration with discovery enabled. Older runtimes reject affected action reports
+without changing admission. The action API also supports optional `toolSchema:
+{serverId, hash}` on trusted registered definitions; it is snapshotted and validated,
+never read from tool arguments. This is SDK-reported metadata, not authorization
+or independent verification of a schema.

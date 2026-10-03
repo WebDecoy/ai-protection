@@ -4,7 +4,7 @@ import type {CallToolResult, Tool} from '@modelcontextprotocol/sdk/types.js';
 import type {ActionContext, ActionDefinition, ActionEvent, ActionRuntime, TrustedCaller} from './actions.mjs';
 
 /** Explicitly registered tool; inputSchema describes discovery, validate enforces input. */
-export interface ProtectedTool extends ActionDefinition {
+export interface ProtectedTool extends Omit<ActionDefinition, 'toolSchema'> {
   description: string;
   inputSchema: Tool['inputSchema'];
   /** Await all protected work and return a complete MCP result, never a detached stream. */
@@ -21,7 +21,7 @@ export interface ProtectedMCPOptions {
   policyVersion: string;
   sharedRuntime?: ActionRuntime;
   tools: Record<string, ProtectedTool>;
-  /** Opt-in tools/list metadata: stable non-secret server label and SHA-256 input-schema hashes.
+  /** Opt-in tools/list and tools/call metadata: stable non-secret server label and SHA-256 input-schema hashes.
    * Requires sharedRuntime. Reuse serverId across replicas; separate different servers.
    */
   discovery?: { serverId: string };
