@@ -75,8 +75,8 @@ export function createActionProtection(options) {
         (definition.policy !== undefined && typeof definition.policy !== 'function')) throw Error('Invalid action definition');
     const t = definition.toolSchema;
     if (t !== undefined && (!t || typeof t.serverId !== 'string' || !token.test(t.serverId) ||
-        typeof t.hash !== 'string' || !/^[a-f0-9]{64}$/.test(t.hash))) throw Error('Invalid tool schema evidence');
-    const toolSchema = t === undefined ? undefined : Object.freeze({serverId:t.serverId,hash:t.hash,...(t.effect===undefined?{}:{effect:snapshotToolEffect(t.effect)}),...(t.permissions===undefined?{}:{permissions:snapshotToolPermissions(t.permissions)})});
+        (t.decoy!==undefined && !['advertised','unadvertised'].includes(t.decoy)) || typeof t.hash !== 'string' || !/^[a-f0-9]{64}$/.test(t.hash))) throw Error('Invalid tool schema evidence');
+    const toolSchema = t === undefined ? undefined : Object.freeze({serverId:t.serverId,hash:t.hash,...(t.decoy?{decoy:t.decoy}:{}),...(t.effect===undefined?{}:{effect:snapshotToolEffect(t.effect)}),...(t.permissions===undefined?{}:{permissions:snapshotToolPermissions(t.permissions)})});
     actions.set(name, Object.freeze({...definition,toolSchema,requiredScopes:Object.freeze([...definition.requiredScopes])}));
   }
   if (!actions.size || actions.size > 128) throw Error('Expected 1–128 actions');

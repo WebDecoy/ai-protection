@@ -8,12 +8,12 @@ import {generateKeyPair,exportJWK,SignJWT} from 'jose';
 import {createAuth0Authenticator} from '../../auth0/authenticate.mjs';
 const keys=await generateKeyPair('RS256');const jwk={...await exportJWK(keys.publicKey),kid:'fixture',alg:'RS256',use:'sig'};
 const issuer='https://fixture.auth0.com/';
-async function fixture(t,{blocked=false,sharedRuntime,discovery,inputSchema,annotations,registry}={}){
+async function fixture(t,{blocked=false,sharedRuntime,discovery,inputSchema,annotations,registry,decoys}={}){
  let handler;const http=createServer((req,res)=>{void handler(req,res);});
  await new Promise(r=>http.listen(0,'127.0.0.1',r));const resource=`http://127.0.0.1:${http.address().port}/mcp`;
  let reads=0,exports=0,cancelled=0;const events=[];let started;const startedPromise=new Promise(r=>started=r);
  const authenticate=createAuth0Authenticator({issuer,audience:resource,fetcher:async()=>Response.json({keys:[jwk]}),resolveTenant:({organizationId})=>organizationId==='org_a'?'a':organizationId==='org_b'?'b':null});
- handler=createProtectedMCPHandler({sharedRuntime,discovery,resource,authorizationServer:issuer,authenticate,policyVersion:'records_v1',onEvent:e=>events.push(e),tools:registry??{
+ handler=createProtectedMCPHandler({sharedRuntime,discovery,decoys,resource,authorizationServer:issuer,authenticate,policyVersion:'records_v1',onEvent:e=>events.push(e),tools:registry??{
   'records.read':{annotations,description:'Read an owned record',inputSchema:inputSchema??{type:'object',properties:{id:{type:'string'}},required:['id'],additionalProperties:false},requiredScopes:['records:read'],validate:args=>Object.keys(args).length===1&&typeof args.id==='string',authorize:({caller,args})=>caller.tenant===args.id,execute:async({signal})=>{reads++;started();if(blocked)await new Promise((_,reject)=>{if(signal.aborted){cancelled++;reject(signal.reason);}else signal.addEventListener('abort',()=>{cancelled++;reject(signal.reason);},{once:true});});return {content:[{type:'text',text:'owned record'}]};}},
   'records.export':{description:'Export records',inputSchema:{type:'object'},requiredScopes:['records:export'],validate:()=>true,authorize:()=>false,execute:()=>{exports++;return {content:[]};}},
  }});
@@ -152,4 +152,40 @@ test('scope-free tool reports policy presence without weakening application deni
  assert.deepEqual(sink.reports[0].tool_catalog.tools[0].permissions,expected);
  const denied=await result(await f.post(call('delete_record',{})));assert.equal(denied.result.isError,true);await awaitReports(sink,2);
  assert.deepEqual(sink.reports[1].tool_action.tool_schema.permissions,expected);assert.equal(executions,0);
+});
+
+test('explicit decoys are scoped, quietly deny, and never execute customer work',async t=>{
+ const sink=await reportingFixture(t);
+ const decoys={billing_export_ledger:{description:'Internal ledger export',visibility:'advertised'},admin_rotate_keys:{description:'Internal key rotation',visibility:'unadvertised'}};
+ const f=await fixture(t,{sharedRuntime:sink.sharedRuntime,discovery:{serverId:'decoy_server'},decoys});
+ decoys.admin_rotate_keys.visibility='advertised'; // startup snapshot stays unadvertised
+ const listed=await result(await f.post({jsonrpc:'2.0',id:1,method:'tools/list',params:{}}));await f.flush();
+ assert.deepEqual(listed.result.tools.map(t=>t.name),['records.read','billing_export_ledger']);
+ assert.ok(!JSON.stringify(listed).includes('decoy'));assert.equal(sink.reports.filter(r=>r.schema===2).length,0);
+ assert.equal((await f.post(call('billing_export_ledger',{}),{bearer:null})).status,401);await f.flush();assert.equal(sink.reports.length,1);
+ const catalog=sink.reports[0].tool_catalog.tools;assert.equal(catalog.find(t=>t.name==='billing_export_ledger').decoy,'advertised');assert.equal(catalog.find(t=>t.name==='records.read').decoy,undefined);
+ for(const name of ['billing_export_ledger','admin_rotate_keys']){
+  const response=await result(await f.post(call(name,{secret:'private-argument'})));
+  assert.equal(response.result.isError,true);assert.match(response.result.content[0].text,/permission_denied/);assert.equal(response.result._meta['webdecoy.com/action-error'].reason,'permission_denied');assert.ok(!JSON.stringify(response).includes('"decoy"'));
+ }
+ await awaitReports(sink,3);
+ const trips=sink.reports.filter(r=>r.schema===2);assert.equal(trips.length,2);
+ for(const r of trips){assert.equal(r.handler_attempted,false);assert.equal(r.tool_action.outcome,'not_attempted');assert.equal(r.tool_action.tool_schema.permissions,undefined);assert.equal(r.tool_action.tool_schema.effect,undefined);assert.ok(['advertised','unadvertised'].includes(r.tool_action.tool_schema.decoy));}
+ assert.ok(!JSON.stringify(sink.reports).includes('private-argument'));assert.deepEqual(f.counts(),{reads:0,exports:0,cancelled:0});
+ await result(await f.post(call('records.read')));assert.equal(f.counts().reads,1);
+});
+test('decoys reject collisions, callbacks, oversized registries and missing reporting',async t=>{
+ const sink=await reportingFixture(t);
+ const base={resource:'https://fixture.test/mcp',authorizationServer:'https://issuer.test',authenticate:async()=>({}),policyVersion:'v1',tools:{real:{description:'real',inputSchema:{type:'object'},requiredScopes:[],validate:()=>true,authorize:()=>true,execute:()=>({content:[]})}},sharedRuntime:sink.sharedRuntime,discovery:{serverId:'test'}};
+ const d={description:'Internal fixture',visibility:'unadvertised'};
+ for(const decoys of [{real:d},{fake:{...d,execute:()=>{throw Error('must not run');}}},{fake:{...d,visibility:'public'}},Object.fromEntries(Array.from({length:9},(_,i)=>['d'+i,d]))])assert.throws(()=>createProtectedMCPHandler({...base,decoys}));
+ assert.throws(()=>createProtectedMCPHandler({...base,decoys:{fake:d},discovery:undefined}));
+ assert.doesNotThrow(()=>createProtectedMCPHandler(base));
+});
+
+test('reporting outage cannot turn a decoy into executable work',async t=>{
+ const sink=await reportingFixture(t,503);const f=await fixture(t,{sharedRuntime:sink.sharedRuntime,discovery:{serverId:'fixture'},decoys:{internal:{description:'Internal fixture',visibility:'unadvertised'}}});
+ const denied=await result(await f.post(call('internal',{})));assert.match(denied.result.content[0].text,/permission_denied/);assert.equal(f.counts().reads,0);
+ await awaitReports(sink,1);assert.equal(sink.reports[0].handler_attempted,false);
+ await result(await f.post(call('records.read')));assert.equal(f.counts().reads,1);await awaitReports(sink,3);
 });

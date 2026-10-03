@@ -39,7 +39,7 @@ export function prepareActionRuntime(options, definitions) {
       const payload={schema:2,request_id:event.eventId,timestamp:event.timestamp,decision:event.decision,reason:event.reason,
         degraded:event.checks.some(c=>c.decision==='unavailable'),checks,handler_attempted:event.attempted,
         action:event.decision==='deny'?'denied':event.outcome==='unknown'?'handler_error':'forwarded',
-        tool_action:{action_id:event.actionId,name:event.action,policy_version:event.policyVersion,outcome:event.outcome,...(event.toolSchema?{tool_schema:{server_id:event.toolSchema.serverId,hash:event.toolSchema.hash,...(event.toolSchema.effect?{effect:event.toolSchema.effect}:{}),...(event.toolSchema.permissions?{permissions:event.toolSchema.permissions}:{})}}:{}),...(event.caller?{caller:event.caller}:{}),...(event.work?{work:event.work}:{})}};
+        tool_action:{action_id:event.actionId,name:event.action,policy_version:event.policyVersion,outcome:event.outcome,...(event.toolSchema?{tool_schema:{server_id:event.toolSchema.serverId,hash:event.toolSchema.hash,...(event.toolSchema.decoy?{decoy:event.toolSchema.decoy}:{}),...(event.toolSchema.effect?{effect:event.toolSchema.effect}:{}),...(event.toolSchema.permissions?{permissions:event.toolSchema.permissions}:{})}}:{}),...(event.caller?{caller:event.caller}:{}),...(event.work?{work:event.work}:{})}};
       const response=await fetch(new URL('/api/v1/sdk/ai-abuse/reports',url),{method:'POST',redirect:'error',signal,
         headers:{Authorization:`Bearer ${c.webdecoyKey}`,'X-WebDecoy-Property-ID':c.propertyId,'Content-Type':'application/json'},body:JSON.stringify(payload)});
       await response.body?.cancel();if(!response.ok)throw Error('Action reporting unavailable');
