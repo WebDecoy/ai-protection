@@ -4,7 +4,7 @@ Bot and abuse protection for AI-powered applications. A small Node.js SDK that
 checks requests before your application invokes a model. Customer-defined rules run
 locally; proprietary bot detection runs in WebDecoy. See [architecture](ARCHITECTURE.md).
 
-**Alpha release: `0.1.0-alpha.3`.** Integration mechanics are tested;
+**Alpha release: `0.1.0-alpha.12`.** Integration mechanics are tested;
 real-world detection accuracy and provider cost savings have not been established.
 Requires a WebDecoy property, a property-scoped API key, and a compatible WebDecoy
 service deployment. This repository contains the SDK, not the detection service.
@@ -16,7 +16,9 @@ npm install @webdecoy/ai-protection@alpha
 ```
 
 Node.js 22.22.3 or newer is required. The SDK has no runtime npm dependencies.
-Edge runtimes are not supported. Licensed under [Apache-2.0](LICENSE).
+Experimental Cloudflare Workers admission support is available through the
+[`/workers` entry point](WORKERS.md), with Node compatibility enabled. Workers
+concurrency and budgets, and other Edge runtimes, are not supported. Licensed under [Apache-2.0](LICENSE).
 
 Set `WEBDECOY_URL=https://ai-protection.webdecoy.com` on your server.
 Create a property-scoped API key with Write Detections permission in WebDecoy,
@@ -24,7 +26,7 @@ then review results at [AI Protection](https://app.webdecoy.com/ai-protection).
 
 ## Integrate
 
-Create the instance once in a **server-only module**, then call it inside your
+For Node.js, create the instance once in a **server-only module**, then call it inside your
 existing authenticated and validated AI endpoint:
 
 ```ts
