@@ -4,6 +4,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema, ErrorCode, McpError } fr
 import { createActionProtection, ActionDenied } from './actions.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { createReporter } from './reporting.mjs';
+import { inferToolEffect, snapshotToolHints } from './tool-effects.mjs';
 const metadataPath = '/.well-known/oauth-protected-resource/mcp';
 export function createProtectedMCPHandler(options) {
     const resource = new URL(options.resource), issuer = new URL(options.authorizationServer);
@@ -11,7 +12,7 @@ export function createProtectedMCPHandler(options) {
     if ((resource.protocol !== 'https:' && !(loopback && resource.protocol === 'http:')) || resource.pathname !== '/mcp' || resource.search || resource.hash || resource.username || resource.password || issuer.protocol !== 'https:' || issuer.search || issuer.hash || issuer.username || issuer.password)
         throw Error('Invalid MCP resource configuration');
     const metadataURL = new URL(metadataPath, resource).href;
-    const tools = Object.fromEntries(Object.entries(options.tools).map(([name, t]) => [name, { ...t, toolSchema: undefined, requiredScopes: [...t.requiredScopes], inputSchema: structuredClone(t.inputSchema) }]));
+    const tools = Object.fromEntries(Object.entries(options.tools).map(([name, t]) => [name, { ...t, toolSchema: undefined, annotations: snapshotToolHints(t.annotations), requiredScopes: [...t.requiredScopes], inputSchema: structuredClone(t.inputSchema) }]));
     // Validate the closed registry at startup, not only after a client arrives.
     createActionProtection({ policyVersion: options.policyVersion, authenticate: options.authenticate, actions: tools, sharedRuntime: options.sharedRuntime });
     for (const tool of Object.values(tools))
@@ -31,7 +32,7 @@ export function createProtectedMCPHandler(options) {
     const hashes = options.discovery ? Object.fromEntries(Object.entries(tools).map(([name, tool]) =>
         [name, createHash('sha256').update(canonical(JSON.parse(JSON.stringify(tool.inputSchema)))).digest('hex')])) : {};
     if (options.discovery) for (const [name, tool] of Object.entries(tools))
-        tool.toolSchema = Object.freeze({serverId:options.discovery.serverId,hash:hashes[name]});
+        tool.toolSchema = Object.freeze({serverId:options.discovery.serverId,hash:hashes[name],effect:inferToolEffect(name,tool.inputSchema,tool.annotations)});
     const runtime = options.sharedRuntime && { ...options.sharedRuntime };
     const serverId = options.discovery?.serverId;
     const catalogReporter = options.discovery ? createReporter({
@@ -42,7 +43,7 @@ export function createProtectedMCPHandler(options) {
                 method: 'POST', redirect: 'error', signal,
                 headers: { Authorization: `Bearer ${runtime.webdecoyKey}`, 'X-WebDecoy-Property-ID': runtime.propertyId, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ schema: 3, request_id: randomUUID(), timestamp: new Date().toISOString(), action: 'tool_discovery',
-                    tool_catalog: { server_id: serverId, source: 'tools_list', tools: names.map(name => ({ name, schema_hash: hashes[name] })) } })
+                    tool_catalog: { server_id: serverId, source: 'tools_list', tools: names.map(name => ({ name, schema_hash: hashes[name], effect: tools[name].toolSchema.effect })) } })
             });
             await response.body?.cancel();
             if (!response.ok) throw Error('Discovery reporting unavailable');
@@ -197,8 +198,8 @@ export function createProtectedMCPHandler(options) {
             res.once('close', () => { void server.close().catch(() => { }); });
             server.setRequestHandler(ListToolsRequestSchema, async () => {
                 const visible = Object.entries(tools).filter(([, tool]) => tool.requiredScopes.every(s => caller.scopes.includes(s)));
-                if (visible.length) void catalogReporter?.send(visible.map(([name]) => name));
-                return { tools: visible.map(([name, tool]) => ({ name, description: tool.description, inputSchema: tool.inputSchema })) };
+                for (let i=0;i<visible.length;i+=64) void catalogReporter?.send(visible.slice(i,i+64).map(([name]) => name));
+                return { tools: visible.map(([name, tool]) => ({ name, description: tool.description, inputSchema: tool.inputSchema, ...(tool.annotations ? {annotations:tool.annotations} : {}) })) };
             });
             server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
                 if (!Object.hasOwn(tools, request.params.name))

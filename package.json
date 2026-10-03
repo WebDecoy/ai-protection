@@ -10,7 +10,7 @@
     "check:package": "node scripts/check-package.mjs",
     "test:types": "tsc --strict --noEmit --module nodenext --target es2022 test/types.mts test/mcp-types.mts"
   },
-  "version": "0.1.0-alpha.8",
+  "version": "0.1.0-alpha.9",
   "exports": {
     "./fetch": {
       "types": "./fetch.d.mts",
@@ -62,7 +62,8 @@
     "mcp.d.mts",
     "MCP.md",
     "work.mjs",
-    "WORK.md"
+    "WORK.md",
+    "tool-effects.mjs"
   ],
   "description": "Bot and abuse protection for AI-powered applications. Server-side request admission for Node.js.",
   "license": "Apache-2.0",

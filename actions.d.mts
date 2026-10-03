@@ -33,7 +33,12 @@ export interface ActionWork {
  measure?(result:unknown,context:ActionContext):number;
 }
 /** Server-supplied metadata, not proof of a verified schema or authorization. */
-export interface ToolSchemaEvidence { readonly serverId: string; readonly hash: string; }
+export interface ToolEffectEvidence {
+ readonly schema: 1;
+ readonly level: 'unknown' | 'read_only' | 'mutating' | 'destructive';
+ readonly reason: 'insufficient_signals' | 'annotation_read_only' | 'name_read_only' | 'annotation_mutating' | 'name_mutating' | 'schema_mutating' | 'annotation_destructive' | 'name_destructive' | 'schema_destructive' | 'conflicting_hints';
+}
+export interface ToolSchemaEvidence { readonly serverId: string; readonly hash: string; readonly effect?: ToolEffectEvidence; }
 export interface ActionEvent {
   readonly toolSchema?: ToolSchemaEvidence;
   /** Pseudonymous application-authenticated subject, not WebDecoy-verified agent identity. */
