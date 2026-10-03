@@ -11,7 +11,7 @@ resource authorization.
 Available in `0.1.0-alpha.5` and later compatible alpha releases:
 
 ```sh
-npm install @webdecoy/ai-protection@0.1.0-alpha.9 @modelcontextprotocol/sdk@1.31.0
+npm install @webdecoy/ai-protection@0.1.0-alpha.10 @modelcontextprotocol/sdk@1.31.0
 ```
 
 Requires Node 22.22.3+ and MCP SDK **1.31.0**. The MCP SDK is an optional peer, so
@@ -236,3 +236,36 @@ classification metadata remain unknown, though customers can label their tools.
 Requires a runtime accepting optional `effect` evidence. Deploy it before
 upgrading a discovery-enabled integration. Large registries are split into
 bounded catalog batches so added metadata stays within report body limits.
+
+## Reviewing tool permissions
+
+Discovery reports configuration evidence for each registered tool: the number of
+`requiredScopes`, the presence of the mandatory `authorize` callback, and whether
+an additional `policy` callback is configured. It never reports scope names or
+callback code. These are SDK-reported settings, not verified authorization quality.
+This metadata starts in Node alpha.10. Deploy a compatible runtime before upgrading.
+
+The inventory asks you to review a potentially mutating/destructive tool with no
+required scopes. This does **not** mean it is unprotected: application authorization
+may already provide sufficient protection. Review the named server/tool in your
+registry and check the application's tenant/resource ownership checks. Where your
+OAuth model uses per-tool scopes, configure them on that tool, for example:
+
+```js
+requiredScopes: ['records:write'],
+authorize: ({caller, args, signal}) =>
+  canModifyRecord(caller.tenant, caller.subject, args.id, {signal}),
+```
+
+`canModifyRecord` is your application's authorization function. Preserve ownership
+checks at the database transaction that performs the write. After deploying, make
+an authenticated tools/list or tools/call request and refresh the inventory.
+The dashboard cannot edit or inspect your application callback. An additional
+policy cannot override a deny from application authorization.
+
+Older/missing evidence remains unknown. Conflicting reported configurations for
+the selected input-schema hash remain conflicting. The seven-day bounded sample
+can include both sides of a rolling deployment; it does not certify the latest
+running configuration or prove that unwrapped routes are protected. A changed
+scope or callback does not change the input-schema hash. No enforcement behavior
+changes when discovery is enabled.

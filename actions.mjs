@@ -2,7 +2,7 @@ import {randomUUID} from 'node:crypto';
 import {abortable} from './transport.mjs';
 import {prepareActionRuntime} from './action-runtime.mjs';
 
-import { snapshotToolEffect } from './tool-effects.mjs';
+import { snapshotToolEffect, snapshotToolPermissions } from './tool-effects.mjs';
 const token = /^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,95}$/;
 const bounded = value => typeof value === 'string' && value.isWellFormed() && value.length > 0 && value.length <= 512 && !/[\x00-\x1f\x7f]/.test(value);
 const freeze = value => {
@@ -76,7 +76,7 @@ export function createActionProtection(options) {
     const t = definition.toolSchema;
     if (t !== undefined && (!t || typeof t.serverId !== 'string' || !token.test(t.serverId) ||
         typeof t.hash !== 'string' || !/^[a-f0-9]{64}$/.test(t.hash))) throw Error('Invalid tool schema evidence');
-    const toolSchema = t === undefined ? undefined : Object.freeze({serverId:t.serverId,hash:t.hash,...(t.effect===undefined?{}:{effect:snapshotToolEffect(t.effect)})});
+    const toolSchema = t === undefined ? undefined : Object.freeze({serverId:t.serverId,hash:t.hash,...(t.effect===undefined?{}:{effect:snapshotToolEffect(t.effect)}),...(t.permissions===undefined?{}:{permissions:snapshotToolPermissions(t.permissions)})});
     actions.set(name, Object.freeze({...definition,toolSchema,requiredScopes:Object.freeze([...definition.requiredScopes])}));
   }
   if (!actions.size || actions.size > 128) throw Error('Expected 1–128 actions');

@@ -25,3 +25,12 @@ test('only fixed effect codes and boolean annotation hints survive snapshots',()
  assert.throws(()=>snapshotToolEffect({schema:2,level:'read_only',reason:'name_read_only'}));
  assert.deepEqual(snapshotToolEffect({schema:1,level:'unknown',reason:'insufficient_signals',raw:'secret'}),{schema:1,level:'unknown',reason:'insufficient_signals'});
 });
+
+test('permission evidence snapshots only bounded configuration, never scope names or callbacks',async()=>{
+ const {snapshotToolPermissions}=await import('../tool-effects.mjs');
+ const raw={schema:1,required_scopes:0,application_authorization:true,additional_policy:false,scopes:['private:scope'],authorize:()=>true};
+ const evidence=snapshotToolPermissions(raw);raw.required_scopes=12;
+ assert.deepEqual(evidence,{schema:1,required_scopes:0,application_authorization:true,additional_policy:false});assert.ok(Object.isFrozen(evidence));
+ assert.equal(snapshotToolPermissions(undefined),undefined);
+ for(const patch of [{schema:2},{required_scopes:-1},{required_scopes:65},{required_scopes:0.5},{required_scopes:undefined},{application_authorization:false},{additional_policy:undefined}])assert.throws(()=>snapshotToolPermissions({...raw,...patch}),/Invalid tool permission evidence/);
+});

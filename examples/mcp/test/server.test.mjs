@@ -72,7 +72,8 @@ test('opt-in discovery reports only advertised names and hashes, before any exec
  assert.deepEqual(Object.keys(r).sort(),['action','request_id','schema','timestamp','tool_catalog']);
  assert.deepEqual(Object.keys(r.tool_catalog).sort(),['server_id','source','tools']);
  assert.equal(r.tool_catalog.server_id,'records');assert.equal(r.tool_catalog.source,'tools_list');
- assert.equal(r.tool_catalog.tools.length,1);assert.deepEqual(Object.keys(r.tool_catalog.tools[0]).sort(),['effect','name','schema_hash']);
+ assert.equal(r.tool_catalog.tools.length,1);assert.deepEqual(Object.keys(r.tool_catalog.tools[0]).sort(),['effect','name','permissions','schema_hash']);
+ assert.deepEqual(r.tool_catalog.tools[0].permissions,{schema:1,required_scopes:1,application_authorization:true,additional_policy:false});
  assert.match(r.tool_catalog.tools[0].schema_hash,/^[a-f0-9]{64}$/);
  const raw=JSON.stringify(r);for(const secret of ['reader','org_a','owned record','inputSchema','description','requiredScopes','test-key'])assert.equal(raw.includes(secret),false);
  const denied=await f.post({jsonrpc:'2.0',id:2,method:'tools/list',params:{}},{bearer:null});assert.equal(denied.status,401);await f.flush();assert.equal(sink.reports.length,1);
@@ -139,4 +140,16 @@ test('maximum registry advertisements stay within runtime body bounds',async t=>
  const listed=await result(await f.post({jsonrpc:'2.0',id:1,method:'tools/list',params:{}}));assert.equal(listed.result.tools.length,128);await f.flush();
  assert.equal(sink.reports.flatMap(r=>r.tool_catalog.tools).length,128);
  for(const r of sink.reports){assert.ok(Buffer.byteLength(JSON.stringify(r))<=32768);assert.equal(r.tool_catalog.tools[0].effect.level,'destructive');}
+});
+
+test('scope-free tool reports policy presence without weakening application denial',async t=>{
+ const sink=await reportingFixture(t);let executions=0;
+ const registry={delete_record:{description:'fixture',inputSchema:{type:'object'},requiredScopes:[],validate:()=>true,authorize:()=>false,policy:()=>true,execute:()=>{executions++;return {content:[]};}}};
+ const f=await fixture(t,{sharedRuntime:sink.sharedRuntime,discovery:{serverId:'permissions'},registry});
+ const listed=await result(await f.post({jsonrpc:'2.0',id:1,method:'tools/list',params:{}}));await f.flush();
+ assert.equal(listed.result.tools.length,1);
+ const expected={schema:1,required_scopes:0,application_authorization:true,additional_policy:true};
+ assert.deepEqual(sink.reports[0].tool_catalog.tools[0].permissions,expected);
+ const denied=await result(await f.post(call('delete_record',{})));assert.equal(denied.result.isError,true);await awaitReports(sink,2);
+ assert.deepEqual(sink.reports[1].tool_action.tool_schema.permissions,expected);assert.equal(executions,0);
 });
