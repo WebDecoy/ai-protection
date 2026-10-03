@@ -11,7 +11,7 @@ resource authorization.
 Available in `0.1.0-alpha.5` and later compatible alpha releases:
 
 ```sh
-npm install @webdecoy/ai-protection@0.1.0-alpha.10 @modelcontextprotocol/sdk@1.31.0
+npm install @webdecoy/ai-protection@0.1.0-alpha.11 @modelcontextprotocol/sdk@1.31.0
 ```
 
 Requires Node 22.22.3+ and MCP SDK **1.31.0**. The MCP SDK is an optional peer, so
@@ -269,3 +269,54 @@ can include both sides of a rolling deployment; it does not certify the latest
 running configuration or prove that unwrapped routes are protected. A changed
 scope or callback does not change the input-schema hash. No enforcement behavior
 changes when discovery is enabled.
+
+## Explicit decoy tools (Alpha)
+
+Decoys are off by default. Node alpha.11 supports up to eight explicitly named
+synthetic tools in the protected registry; requires `discovery` and `sharedRuntime`.
+The combined real/decoy registry still has a 128-tool limit. Deploy a compatible
+runtime before upgrading an integration that enables decoys.
+
+```js
+discovery: {serverId: 'billing'},
+decoys: {
+  billing_export_ledger: {
+    description: 'Internal ledger export',
+    visibility: 'advertised',
+  },
+  admin_rotate_keys: {
+    description: 'Internal key rotation',
+    visibility: 'unadvertised',
+  },
+},
+```
+
+Choose names and descriptions outside legitimate workflows; examples are not a
+recommended universal decoy set. Collisions with real tools, callback fields and
+invalid definitions fail startup. Definitions are snapshotted. The SDK provides a
+generic object schema; no custom execution, validation or authorization callbacks
+are accepted for decoys. Advertised decoys appear to authenticated listing clients;
+unadvertised decoys never appear in tools/list. Both accept direct authenticated
+calls only to return the ordinary permission-denied error. Customer code is never
+executed, including when shared telemetry is unavailable. Real tools retain their
+normal authorization and behavior.
+
+Only reported calls count as decoy calls; listing is not a trip. Discovery and
+call reports carry a fixed decoy visibility marker, not arguments, hashes of
+arguments, descriptions or generated identities. Existing opt-in caller attribution
+can associate calls with application-reported pseudonyms. Invalid unauthenticated
+requests, over-limit transport bodies and unwrapped routes are not covered by this
+trip evidence. Delivery remains best effort. A marker is SDK-reported evidence,
+not independently verified server configuration.
+
+The dashboard labels decoys and mixed real/decoy evidence, counts deduplicated
+calls, and excludes synthetic entries from normal permission/advertisement review
+findings. Name-aggregated activity is labeled when it includes decoys. Reusing a
+name for a real tool can yield mixed evidence until retained reports expire.
+
+A decoy call can come from legitimate exploration or a naive agent; it is not proof
+of malicious intent. This slice does not auto-block callers, measure false-positive
+rates, generate seeded names, record initialization events, remotely deliver decoy
+configuration, or provide a labeled test-trigger flow. Configuration requires an
+application deployment. Those remain separate roadmap work. No low-false-positive
+or caller-containment guarantee is made.

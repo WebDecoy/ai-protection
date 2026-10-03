@@ -13,6 +13,22 @@ export function createProtectedMCPHandler(options) {
         throw Error('Invalid MCP resource configuration');
     const metadataURL = new URL(metadataPath, resource).href;
     const tools = Object.fromEntries(Object.entries(options.tools).map(([name, t]) => [name, { ...t, toolSchema: undefined, annotations: snapshotToolHints(t.annotations), requiredScopes: [...t.requiredScopes], inputSchema: structuredClone(t.inputSchema) }]));
+    const decoys = new Map();
+    if (options.decoys !== undefined) {
+        if (!options.discovery || !options.sharedRuntime || !options.decoys || typeof options.decoys !== 'object' || Array.isArray(options.decoys)) throw Error('Decoys require discovery and sharedRuntime');
+        const entries = Object.entries(options.decoys);
+        if (entries.length > 8) throw Error('At most 8 decoys are supported');
+        for (const [name, definition] of entries) {
+            if (!/^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,95}$/.test(name) || Object.hasOwn(tools, name) || !definition ||
+                Object.keys(definition).some(k => !['description', 'visibility'].includes(k)) ||
+                typeof definition.description !== 'string' || !definition.description.trim() || definition.description.length > 512 ||
+                !['advertised', 'unadvertised'].includes(definition.visibility)) throw Error('Invalid or colliding decoy definition');
+            decoys.set(name, definition.visibility);
+            tools[name] = { description: definition.description, inputSchema: {type:'object'}, requiredScopes:[],
+                validate: () => true, authorize: () => false,
+                execute: () => { throw Error('Decoy dispatch invariant violated'); } };
+        }
+    }
     // Validate the closed registry at startup, not only after a client arrives.
     createActionProtection({ policyVersion: options.policyVersion, authenticate: options.authenticate, actions: tools, sharedRuntime: options.sharedRuntime });
     for (const tool of Object.values(tools))
@@ -32,7 +48,7 @@ export function createProtectedMCPHandler(options) {
     const hashes = options.discovery ? Object.fromEntries(Object.entries(tools).map(([name, tool]) =>
         [name, createHash('sha256').update(canonical(JSON.parse(JSON.stringify(tool.inputSchema)))).digest('hex')])) : {};
     if (options.discovery) for (const [name, tool] of Object.entries(tools))
-        tool.toolSchema = Object.freeze({serverId:options.discovery.serverId,hash:hashes[name],effect:inferToolEffect(name,tool.inputSchema,tool.annotations),permissions:Object.freeze({schema:1,required_scopes:tool.requiredScopes.length,application_authorization:true,additional_policy:typeof tool.policy==='function'})});
+        tool.toolSchema = Object.freeze({serverId:options.discovery.serverId,hash:hashes[name],...(decoys.has(name)?{decoy:decoys.get(name)}:{effect:inferToolEffect(name,tool.inputSchema,tool.annotations),permissions:Object.freeze({schema:1,required_scopes:tool.requiredScopes.length,application_authorization:true,additional_policy:typeof tool.policy==='function'})})});
     const runtime = options.sharedRuntime && { ...options.sharedRuntime };
     const serverId = options.discovery?.serverId;
     const catalogReporter = options.discovery ? createReporter({
@@ -43,7 +59,7 @@ export function createProtectedMCPHandler(options) {
                 method: 'POST', redirect: 'error', signal,
                 headers: { Authorization: `Bearer ${runtime.webdecoyKey}`, 'X-WebDecoy-Property-ID': runtime.propertyId, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ schema: 3, request_id: randomUUID(), timestamp: new Date().toISOString(), action: 'tool_discovery',
-                    tool_catalog: { server_id: serverId, source: 'tools_list', tools: names.map(name => ({ name, schema_hash: hashes[name], effect: tools[name].toolSchema.effect, permissions: tools[name].toolSchema.permissions })) } })
+                    tool_catalog: { server_id: serverId, source: 'tools_list', tools: names.map(name => ({ name, schema_hash: hashes[name], effect: tools[name].toolSchema.effect, permissions: tools[name].toolSchema.permissions, ...(decoys.has(name)?{decoy:decoys.get(name)}:{}) })) } })
             });
             await response.body?.cancel();
             if (!response.ok) throw Error('Discovery reporting unavailable');
@@ -197,7 +213,7 @@ export function createProtectedMCPHandler(options) {
             const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: false });
             res.once('close', () => { void server.close().catch(() => { }); });
             server.setRequestHandler(ListToolsRequestSchema, async () => {
-                const visible = Object.entries(tools).filter(([, tool]) => tool.requiredScopes.every(s => caller.scopes.includes(s)));
+                const visible = Object.entries(tools).filter(([name, tool]) => decoys.get(name) !== 'unadvertised' && tool.requiredScopes.every(s => caller.scopes.includes(s)));
                 for (let i=0;i<visible.length;i+=64) void catalogReporter?.send(visible.slice(i,i+64).map(([name]) => name));
                 return { tools: visible.map(([name, tool]) => ({ name, description: tool.description, inputSchema: tool.inputSchema, ...(tool.annotations ? {annotations:tool.annotations} : {}) })) };
             });

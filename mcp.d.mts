@@ -23,6 +23,10 @@ export interface ProtectedMCPOptions {
   policyVersion: string;
   sharedRuntime?: ActionRuntime;
   tools: Record<string, ProtectedTool>;
+  /** Opt-in, at most eight named decoys. Requires discovery + sharedRuntime.
+   * Never accepts customer execution callbacks. Combined real/decoy registry <=128.
+   */
+  decoys?: Record<string, {description: string; visibility: 'advertised' | 'unadvertised'}>;
   /** Opt-in tools/list and tools/call metadata: stable non-secret server label and SHA-256 input-schema hashes.
    * Requires sharedRuntime. Reuse serverId across replicas; separate different servers.
    */
