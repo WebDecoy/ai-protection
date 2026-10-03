@@ -32,7 +32,7 @@ export function createProtectedMCPHandler(options) {
     const hashes = options.discovery ? Object.fromEntries(Object.entries(tools).map(([name, tool]) =>
         [name, createHash('sha256').update(canonical(JSON.parse(JSON.stringify(tool.inputSchema)))).digest('hex')])) : {};
     if (options.discovery) for (const [name, tool] of Object.entries(tools))
-        tool.toolSchema = Object.freeze({serverId:options.discovery.serverId,hash:hashes[name],effect:inferToolEffect(name,tool.inputSchema,tool.annotations)});
+        tool.toolSchema = Object.freeze({serverId:options.discovery.serverId,hash:hashes[name],effect:inferToolEffect(name,tool.inputSchema,tool.annotations),permissions:Object.freeze({schema:1,required_scopes:tool.requiredScopes.length,application_authorization:true,additional_policy:typeof tool.policy==='function'})});
     const runtime = options.sharedRuntime && { ...options.sharedRuntime };
     const serverId = options.discovery?.serverId;
     const catalogReporter = options.discovery ? createReporter({
@@ -43,7 +43,7 @@ export function createProtectedMCPHandler(options) {
                 method: 'POST', redirect: 'error', signal,
                 headers: { Authorization: `Bearer ${runtime.webdecoyKey}`, 'X-WebDecoy-Property-ID': runtime.propertyId, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ schema: 3, request_id: randomUUID(), timestamp: new Date().toISOString(), action: 'tool_discovery',
-                    tool_catalog: { server_id: serverId, source: 'tools_list', tools: names.map(name => ({ name, schema_hash: hashes[name], effect: tools[name].toolSchema.effect })) } })
+                    tool_catalog: { server_id: serverId, source: 'tools_list', tools: names.map(name => ({ name, schema_hash: hashes[name], effect: tools[name].toolSchema.effect, permissions: tools[name].toolSchema.permissions })) } })
             });
             await response.body?.cancel();
             if (!response.ok) throw Error('Discovery reporting unavailable');

@@ -38,7 +38,8 @@ export interface ToolEffectEvidence {
  readonly level: 'unknown' | 'read_only' | 'mutating' | 'destructive';
  readonly reason: 'insufficient_signals' | 'annotation_read_only' | 'name_read_only' | 'annotation_mutating' | 'name_mutating' | 'schema_mutating' | 'annotation_destructive' | 'name_destructive' | 'schema_destructive' | 'conflicting_hints';
 }
-export interface ToolSchemaEvidence { readonly serverId: string; readonly hash: string; readonly effect?: ToolEffectEvidence; }
+export interface ToolPermissionEvidence { readonly schema: 1; readonly required_scopes: number; readonly application_authorization: true; readonly additional_policy: boolean; }
+export interface ToolSchemaEvidence { readonly permissions?: ToolPermissionEvidence; readonly serverId: string; readonly hash: string; readonly effect?: ToolEffectEvidence; }
 export interface ActionEvent {
   readonly toolSchema?: ToolSchemaEvidence;
   /** Pseudonymous application-authenticated subject, not WebDecoy-verified agent identity. */

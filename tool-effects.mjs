@@ -43,3 +43,10 @@ export function inferToolEffect(name,schema,hints) {
   if(hints?.readOnlyHint===true&&['mutating','destructive'].includes(level))reason='conflicting_hints';
   return snapshotToolEffect({schema:1,level,reason});
 }
+
+// Configuration evidence only; never evaluates the customer's callbacks.
+export function snapshotToolPermissions(value) {
+  if(value===undefined)return undefined;
+  if(!value || value.schema!==1 || !Number.isInteger(value.required_scopes) || value.required_scopes<0 || value.required_scopes>64 || value.application_authorization!==true || typeof value.additional_policy!=='boolean')throw Error('Invalid tool permission evidence');
+  return Object.freeze({schema:1,required_scopes:value.required_scopes,application_authorization:true,additional_policy:value.additional_policy});
+}
