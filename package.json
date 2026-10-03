@@ -10,7 +10,7 @@
     "check:package": "node scripts/check-package.mjs",
     "test:types": "tsc --strict --noEmit --module nodenext --target es2022 test/types.mts test/mcp-types.mts"
   },
-  "version": "0.1.0-alpha.6",
+  "version": "0.1.0-alpha.7",
   "exports": {
     "./fetch": {
       "types": "./fetch.d.mts",

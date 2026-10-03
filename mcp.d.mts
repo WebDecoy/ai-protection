@@ -21,6 +21,10 @@ export interface ProtectedMCPOptions {
   policyVersion: string;
   sharedRuntime?: ActionRuntime;
   tools: Record<string, ProtectedTool>;
+  /** Opt-in tools/list metadata: stable non-secret server label and SHA-256 input-schema hashes.
+   * Requires sharedRuntime. Reuse serverId across replicas; separate different servers.
+   */
+  discovery?: { serverId: string };
   /** Exact browser origins; requests without Origin are permitted after authentication. */
   allowedOrigins?: string[];
   /** Best-effort, sanitized action events. */
@@ -33,4 +37,7 @@ export interface ProtectedMCPOptions {
  * Does not wrap existing MCP servers, resources, prompts, tasks or alternate routes.
  */
 export function createProtectedMCPHandler(options: ProtectedMCPOptions):
-  (request: IncomingMessage, response: ServerResponse) => Promise<void>;
+  ((request: IncomingMessage, response: ServerResponse) => Promise<void>) & {
+    /** Drain pending discovery reports at shutdown. Does not wait for running tools. */
+    flush(): Promise<void>;
+  };

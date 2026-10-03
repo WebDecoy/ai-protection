@@ -2,6 +2,8 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { createActionProtection, ActionDenied } from './actions.mjs';
+import { createHash, randomUUID } from 'node:crypto';
+import { createReporter } from './reporting.mjs';
 const metadataPath = '/.well-known/oauth-protected-resource/mcp';
 export function createProtectedMCPHandler(options) {
     const resource = new URL(options.resource), issuer = new URL(options.authorizationServer);
@@ -16,12 +18,40 @@ export function createProtectedMCPHandler(options) {
         for (const scope of tool.requiredScopes)
             if (!/^[\x21\x23-\x5b\x5d-\x7e]+$/.test(scope))
                 throw Error('Invalid OAuth scope');
+    // Opt-in metadata only. Never collect descriptions, raw schemas, scopes,
+    // credentials, arguments or resource URLs in discovery reports.
+    if (options.discovery !== undefined && (!options.sharedRuntime || !options.discovery ||
+        !/^[a-zA-Z0-9][a-zA-Z0-9_.:-]{0,95}$/.test(options.discovery.serverId)))
+        throw Error('Discovery requires sharedRuntime and a stable serverId');
+    const canonical = value => {
+        if (value === null || typeof value !== 'object') return JSON.stringify(value);
+        if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
+        return '{' + Object.keys(value).sort().map(key => JSON.stringify(key) + ':' + canonical(value[key])).join(',') + '}';
+    };
+    const hashes = options.discovery ? Object.fromEntries(Object.entries(tools).map(([name, tool]) =>
+        [name, createHash('sha256').update(canonical(JSON.parse(JSON.stringify(tool.inputSchema)))).digest('hex')])) : {};
+    const runtime = options.sharedRuntime && { ...options.sharedRuntime };
+    const serverId = options.discovery?.serverId;
+    const catalogReporter = options.discovery ? createReporter({
+        reportingTimeoutMs: runtime.reportingTimeoutMs ?? 1000,
+        maxPendingReports: runtime.maxPendingReports ?? 100,
+        onObservation: async (names, { signal }) => {
+            const response = await fetch(new URL('/api/v1/sdk/ai-abuse/reports', runtime.webdecoyUrl), {
+                method: 'POST', redirect: 'error', signal,
+                headers: { Authorization: `Bearer ${runtime.webdecoyKey}`, 'X-WebDecoy-Property-ID': runtime.propertyId, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ schema: 3, request_id: randomUUID(), timestamp: new Date().toISOString(), action: 'tool_discovery',
+                    tool_catalog: { server_id: serverId, source: 'tools_list', tools: names.map(name => ({ name, schema_hash: hashes[name] })) } })
+            });
+            await response.body?.cancel();
+            if (!response.ok) throw Error('Discovery reporting unavailable');
+        }
+    }) : null;
     const active = new Map();
     const scopes = [...new Set(Object.values(tools).flatMap(t => t.requiredScopes))];
     const origins = new Set(options.allowedOrigins ?? []);
     function respond(res, status, error, headers = {}) { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...headers }); res.end(JSON.stringify({ error })); }
     function challenge(res, status, scope) { respond(res, status, status === 401 ? 'unauthorized' : 'insufficient_scope', { 'WWW-Authenticate': `Bearer resource_metadata="${metadataURL}"${status === 401 ? '' : `, error="insufficient_scope", scope="${scope.join(' ')}"`}` }); }
-    return async function handle(req, res) {
+    const handle = async function (req, res) {
         const disconnected = new AbortController();
         req.once('aborted', () => disconnected.abort());
         res.once('close', () => { if (!res.writableEnded)
@@ -163,9 +193,11 @@ export function createProtectedMCPHandler(options) {
             const server = new Server({ name: 'webdecoy-protected-tools', version: '0.1.0' }, { capabilities: { tools: {} } });
             const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: false });
             res.once('close', () => { void server.close().catch(() => { }); });
-            server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: Object.entries(tools)
-                    .filter(([, tool]) => tool.requiredScopes.every(s => caller.scopes.includes(s)))
-                    .map(([name, tool]) => ({ name, description: tool.description, inputSchema: tool.inputSchema })) }));
+            server.setRequestHandler(ListToolsRequestSchema, async () => {
+                const visible = Object.entries(tools).filter(([, tool]) => tool.requiredScopes.every(s => caller.scopes.includes(s)));
+                if (visible.length) void catalogReporter?.send(visible.map(([name]) => name));
+                return { tools: visible.map(([name, tool]) => ({ name, description: tool.description, inputSchema: tool.inputSchema })) };
+            });
             server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
                 if (!Object.hasOwn(tools, request.params.name))
                     throw new McpError(ErrorCode.InvalidParams, 'Tool unavailable');
@@ -197,4 +229,5 @@ export function createProtectedMCPHandler(options) {
                 res.destroy();
         }
     };
+    return Object.assign(handle, { flush: async () => { await catalogReporter?.flush(); } });
 }

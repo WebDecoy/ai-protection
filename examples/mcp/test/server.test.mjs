@@ -8,19 +8,19 @@ import {generateKeyPair,exportJWK,SignJWT} from 'jose';
 import {createAuth0Authenticator} from '../../auth0/authenticate.mjs';
 const keys=await generateKeyPair('RS256');const jwk={...await exportJWK(keys.publicKey),kid:'fixture',alg:'RS256',use:'sig'};
 const issuer='https://fixture.auth0.com/';
-async function fixture(t,{blocked=false}={}){
+async function fixture(t,{blocked=false,sharedRuntime,discovery,inputSchema}={}){
  let handler;const http=createServer((req,res)=>{void handler(req,res);});
  await new Promise(r=>http.listen(0,'127.0.0.1',r));const resource=`http://127.0.0.1:${http.address().port}/mcp`;
  let reads=0,exports=0,cancelled=0;const events=[];let started;const startedPromise=new Promise(r=>started=r);
  const authenticate=createAuth0Authenticator({issuer,audience:resource,fetcher:async()=>Response.json({keys:[jwk]}),resolveTenant:({organizationId})=>organizationId==='org_a'?'a':organizationId==='org_b'?'b':null});
- handler=createProtectedMCPHandler({resource,authorizationServer:issuer,authenticate,policyVersion:'records_v1',onEvent:e=>events.push(e),tools:{
-  'records.read':{description:'Read an owned record',inputSchema:{type:'object',properties:{id:{type:'string'}},required:['id'],additionalProperties:false},requiredScopes:['records:read'],validate:args=>Object.keys(args).length===1&&typeof args.id==='string',authorize:({caller,args})=>caller.tenant===args.id,execute:async({signal})=>{reads++;started();if(blocked)await new Promise((_,reject)=>{if(signal.aborted){cancelled++;reject(signal.reason);}else signal.addEventListener('abort',()=>{cancelled++;reject(signal.reason);},{once:true});});return {content:[{type:'text',text:'owned record'}]};}},
+ handler=createProtectedMCPHandler({sharedRuntime,discovery,resource,authorizationServer:issuer,authenticate,policyVersion:'records_v1',onEvent:e=>events.push(e),tools:{
+  'records.read':{description:'Read an owned record',inputSchema:inputSchema??{type:'object',properties:{id:{type:'string'}},required:['id'],additionalProperties:false},requiredScopes:['records:read'],validate:args=>Object.keys(args).length===1&&typeof args.id==='string',authorize:({caller,args})=>caller.tenant===args.id,execute:async({signal})=>{reads++;started();if(blocked)await new Promise((_,reject)=>{if(signal.aborted){cancelled++;reject(signal.reason);}else signal.addEventListener('abort',()=>{cancelled++;reject(signal.reason);},{once:true});});return {content:[{type:'text',text:'owned record'}]};}},
   'records.export':{description:'Export records',inputSchema:{type:'object'},requiredScopes:['records:export'],validate:()=>true,authorize:()=>false,execute:()=>{exports++;return {content:[]};}},
  }});
  t.after(()=>{http.closeAllConnections();return new Promise(r=>http.close(r));});
  const token=async(overrides={})=>new SignJWT({sub:'reader',iss:issuer,aud:resource,iat:Math.floor(Date.now()/1000),exp:Math.floor(Date.now()/1000)+60,scope:'records:read',org_id:'org_a',...overrides}).setProtectedHeader({alg:'RS256',kid:'fixture'}).sign(keys.privateKey);
  const post=async(body,{bearer,headers={},signal}={})=>{if(bearer===undefined)bearer=await token();return fetch(resource,{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json, text/event-stream','MCP-Protocol-Version':'2025-11-25',...(bearer?{Authorization:'Bearer '+bearer}:{}),...headers},body:JSON.stringify(body),signal});};
- return {resource,post,token,events,counts:()=>({reads,exports,cancelled}),started:startedPromise};
+ return {resource,post,token,events,flush:()=>handler.flush(),counts:()=>({reads,exports,cancelled}),started:startedPromise};
 }
 const call=(name,args={id:'a'})=>({jsonrpc:'2.0',id:2,method:'tools/call',params:{name,arguments:args}});
 async function result(response){assert.equal(response.status,200);const s=await response.text();const lines=s.split('\n').filter(x=>x.startsWith('data: '));return JSON.parse(lines.at(-1).slice(6));}
@@ -56,3 +56,42 @@ test('active request IDs cannot be overwritten',async t=>{
 });
 test('oversized bodies and unknown tools never execute',async t=>{const f=await fixture(t);const large=await f.post(call('records.read',{id:'a'.repeat(17000)}));assert.equal(large.status,413);const unknown=await result(await f.post(call('not_registered')));assert.equal(unknown.error.code,-32602);assert.equal(f.counts().reads,0);});
 test('unsupported protocol versions and session methods fail explicitly',async t=>{const f=await fixture(t);const r=await f.post(call('records.read'),{headers:{'MCP-Protocol-Version':'2099-01-01'}});assert.equal(r.status,400);for(const method of ['GET','DELETE'])assert.equal((await fetch(f.resource,{method})).status,405);assert.equal(f.counts().reads,0);});
+
+async function reportingFixture(t,status=202){
+ const reports=[];
+ const http=createServer(async(req,res)=>{let raw='';for await(const chunk of req)raw+=chunk;reports.push(JSON.parse(raw));res.writeHead(status);res.end();});
+ await new Promise(r=>http.listen(0,'127.0.0.1',r));t.after(()=>{http.closeAllConnections();return new Promise(r=>http.close(r));});
+ return {reports,sharedRuntime:{webdecoyUrl:`http://127.0.0.1:${http.address().port}`,webdecoyKey:'test-key',propertyId:'11111111-1111-4111-8111-111111111111',subjectSecret:'a'.repeat(32)}};
+}
+test('opt-in discovery reports only advertised names and hashes, before any execution',async t=>{
+ const sink=await reportingFixture(t);const f=await fixture(t,{sharedRuntime:sink.sharedRuntime,discovery:{serverId:'records'}});
+ const reply=await result(await f.post({jsonrpc:'2.0',id:1,method:'tools/list',params:{}}));
+ assert.deepEqual(reply.result.tools.map(t=>t.name),['records.read']);await f.flush();
+ assert.equal(f.counts().reads,0);assert.equal(sink.reports.length,1);
+ const r=sink.reports[0];assert.equal(r.schema,3);assert.equal(r.action,'tool_discovery');
+ assert.deepEqual(Object.keys(r).sort(),['action','request_id','schema','timestamp','tool_catalog']);
+ assert.deepEqual(Object.keys(r.tool_catalog).sort(),['server_id','source','tools']);
+ assert.equal(r.tool_catalog.server_id,'records');assert.equal(r.tool_catalog.source,'tools_list');
+ assert.equal(r.tool_catalog.tools.length,1);assert.deepEqual(Object.keys(r.tool_catalog.tools[0]).sort(),['name','schema_hash']);
+ assert.match(r.tool_catalog.tools[0].schema_hash,/^[a-f0-9]{64}$/);
+ const raw=JSON.stringify(r);for(const secret of ['reader','org_a','owned record','inputSchema','description','requiredScopes','test-key'])assert.equal(raw.includes(secret),false);
+ const denied=await f.post({jsonrpc:'2.0',id:2,method:'tools/list',params:{}},{bearer:null});assert.equal(denied.status,401);await f.flush();assert.equal(sink.reports.length,1);
+});
+test('discovery defaults off and reporter outage never denies tool listing',async t=>{
+ const sink=await reportingFixture(t,503);const off=await fixture(t,{sharedRuntime:sink.sharedRuntime});
+ await result(await off.post({jsonrpc:'2.0',id:1,method:'tools/list',params:{}}));await off.flush();assert.equal(sink.reports.length,0);
+ const on=await fixture(t,{sharedRuntime:sink.sharedRuntime,discovery:{serverId:'records'}});
+ const r=await result(await on.post({jsonrpc:'2.0',id:1,method:'tools/list',params:{}}));assert.equal(r.result.tools.length,1);await on.flush();assert.equal(sink.reports.length,1);
+});
+
+
+test('schema hashing ignores object key order but detects schema edits',async t=>{
+ const sink=await reportingFixture(t);
+ for(const inputSchema of [{type:'object',properties:{id:{type:'string'}}},{properties:{id:{type:'string'}},type:'object'},{type:'object',properties:{id:{type:'number'}}}]){
+  const f=await fixture(t,{sharedRuntime:sink.sharedRuntime,discovery:{serverId:'stable'},inputSchema});
+  await result(await f.post({jsonrpc:'2.0',id:1,method:'tools/list',params:{}}));await f.flush();
+ }
+ assert.equal(sink.reports.length,3);
+ const hashes=sink.reports.map(r=>r.tool_catalog.tools[0].schema_hash);
+ assert.equal(hashes[0],hashes[1]);assert.notEqual(hashes[0],hashes[2]);
+});
