@@ -33,6 +33,8 @@ export interface ActionWork {
  measure?(result:unknown,context:ActionContext):number;
 }
 export interface ActionEvent {
+  /** Pseudonymous application-authenticated subject, not WebDecoy-verified agent identity. */
+  readonly caller?: {readonly schema:1;readonly source:'application_auth';readonly id:string};
   readonly work?:ActionWorkEvidence;
   readonly schema: 1;
   readonly eventId: string;
@@ -56,6 +58,8 @@ export interface ActionLimits {
   concurrency?: {ruleId:string;accountLimit:number;featureLimit:number;mode?:'observe'|'enforce';failureMode?:'open'|'closed';ttlSeconds?:number;maxSeconds?:number;timeoutMs?:number};
 }
 export interface ActionRuntime {
+  /** Opt in to scoped caller pseudonyms in reports. Requires a supporting runtime. Default false. */
+  reportCaller?:boolean;
   webdecoyUrl:string;webdecoyKey:string;propertyId:string;subjectSecret:string;
   reportingTimeoutMs?:number;maxPendingReports?:number;
 }

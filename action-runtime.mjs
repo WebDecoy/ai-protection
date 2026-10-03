@@ -11,7 +11,8 @@ export function prepareActionRuntime(options, definitions) {
   if(!['https:','http:'].includes(url.protocol)||url.username||url.password||url.pathname!=='/'||url.search||url.hash||
     (url.protocol==='http:'&&!['localhost','127.0.0.1','[::1]'].includes(url.hostname))||!validPropertyID(config.propertyId)||
     typeof config.webdecoyKey!=='string'||!config.webdecoyKey||/[^\x21-\x7e]/.test(config.webdecoyKey)||
-    typeof config.subjectSecret!=='string'||Buffer.byteLength(config.subjectSecret)<32)throw Error('Invalid action runtime');
+    typeof config.subjectSecret!=='string'||!config.subjectSecret.isWellFormed()||Buffer.byteLength(config.subjectSecret)<32)throw Error('Invalid action runtime');
+  if(config.reportCaller !== undefined && typeof config.reportCaller !== "boolean")throw Error("Invalid caller reporting option");
   const c={...config};const limits=new Map(),ruleIDs=new Set();
   const subject=(ctx,tenant)=>({accountId:tenant?quotaHash(c.subjectSecret,'webdecoy.actions.tenant.v1',ctx.caller.tenant):quotaHash(c.subjectSecret,'webdecoy.actions.caller.v1',ctx.caller.issuer,ctx.caller.tenant,ctx.caller.subject)});
   for(const [name,d] of definitions){
@@ -38,10 +39,10 @@ export function prepareActionRuntime(options, definitions) {
       const payload={schema:2,request_id:event.eventId,timestamp:event.timestamp,decision:event.decision,reason:event.reason,
         degraded:event.checks.some(c=>c.decision==='unavailable'),checks,handler_attempted:event.attempted,
         action:event.decision==='deny'?'denied':event.outcome==='unknown'?'handler_error':'forwarded',
-        tool_action:{action_id:event.actionId,name:event.action,policy_version:event.policyVersion,outcome:event.outcome,...(event.work?{work:event.work}:{})}};
+        tool_action:{action_id:event.actionId,name:event.action,policy_version:event.policyVersion,outcome:event.outcome,...(event.caller?{caller:event.caller}:{}),...(event.work?{work:event.work}:{})}};
       const response=await fetch(new URL('/api/v1/sdk/ai-abuse/reports',url),{method:'POST',redirect:'error',signal,
         headers:{Authorization:`Bearer ${c.webdecoyKey}`,'X-WebDecoy-Property-ID':c.propertyId,'Content-Type':'application/json'},body:JSON.stringify(payload)});
       await response.body?.cancel();if(!response.ok)throw Error('Action reporting unavailable');
     }});
-  return {limits,report:event=>reporter.send(event),flush:()=>reporter.flush()};
+  return {limits,callerEvidence:caller=>c.reportCaller?Object.freeze({schema:1,source:'application_auth',id:quotaHash(c.subjectSecret,'webdecoy.actions.evidence.caller.v1',c.propertyId.toLowerCase(),caller.issuer,caller.tenant,caller.subject)}):undefined,report:event=>reporter.send(event),flush:()=>reporter.flush()};
 }
