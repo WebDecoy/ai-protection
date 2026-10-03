@@ -72,7 +72,11 @@ export function createActionProtection(options) {
         definition.requiredScopes.some(s => !bounded(s)) ||
         ['validate','authorize','execute'].some(k => typeof definition[k] !== 'function') ||
         (definition.policy !== undefined && typeof definition.policy !== 'function')) throw Error('Invalid action definition');
-    actions.set(name, Object.freeze({...definition,requiredScopes:Object.freeze([...definition.requiredScopes])}));
+    const t = definition.toolSchema;
+    if (t !== undefined && (!t || typeof t.serverId !== 'string' || !token.test(t.serverId) ||
+        typeof t.hash !== 'string' || !/^[a-f0-9]{64}$/.test(t.hash))) throw Error('Invalid tool schema evidence');
+    const toolSchema = t === undefined ? undefined : Object.freeze({serverId:t.serverId,hash:t.hash});
+    actions.set(name, Object.freeze({...definition,toolSchema,requiredScopes:Object.freeze([...definition.requiredScopes])}));
   }
   if (!actions.size || actions.size > 128) throw Error('Expected 1–128 actions');
   const runtime=prepareActionRuntime(options,actions);
@@ -91,7 +95,7 @@ export function createActionProtection(options) {
     function emit(decision, reason, outcome) {
 
       const event = Object.freeze({schema:1, eventId:randomUUID(), timestamp:new Date().toISOString(), actionId, action:eventAction, policyVersion,
-        ...(callerEvidence?{caller:callerEvidence}:{}),evaluation:'local', decision, reason, attempted, outcome,...(work?{work:Object.freeze({...work.evidence})}:{}),checks:Object.freeze(checks.map(c=>Object.freeze({...c})))});
+        ...(callerEvidence?{caller:callerEvidence}:{}),...(action?.toolSchema?{toolSchema:action.toolSchema}:{}),evaluation:'local', decision, reason, attempted, outcome,...(work?{work:Object.freeze({...work.evidence})}:{}),checks:Object.freeze(checks.map(c=>Object.freeze({...c})))});
       if(runtime)void runtime.report(event);
       if(!sink||pendingEvents>=100)return;
       pendingEvents++;

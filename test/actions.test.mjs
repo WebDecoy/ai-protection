@@ -47,3 +47,14 @@ test('admission timer does not cancel successfully admitted work',async()=>{cons
 test('sparse enormous arrays are rejected before serialization',async()=>{const f=fixture();await assert.rejects(f.guard.run('read',new Array(2**32-1),{}),denied('invalid_arguments'));assert.equal(f.calls(),0);});
 test('cancelled execution preserves uncertainty without retry',async()=>{let calls=0;const c=new AbortController();const f=fixture({action:{execute:()=>{calls++;c.abort();return 'possibly completed';}}});await assert.rejects(f.guard.run('read',{recordId:'a'},{},{signal:c.signal}),{name:'AbortError'});assert.equal(calls,1);assert.equal(f.events.at(-1).outcome,'unknown');});
 test('hung observer calls are bounded and never stop actions',async()=>{let observed=0;const f=fixture({options:{onEvent:()=>{observed++;return new Promise(()=>{});}}});for(let i=0;i<60;i++)await f.guard.run('read',{recordId:'a'},{});assert.equal(f.calls(),60);assert.equal(observed,100);});
+
+test('tool schema evidence is immutable, bounded, and absent for unknown actions',async()=>{
+ const metadata={serverId:'records',hash:'a'.repeat(64),private:'not-for-reporting'};
+ const f=fixture({action:{toolSchema:metadata}});metadata.serverId='changed';metadata.hash='b'.repeat(64);
+ await f.guard.run('read',{recordId:'a'},{});
+ for(const event of f.events){assert.deepEqual(event.toolSchema,{serverId:'records',hash:'a'.repeat(64)});assert.ok(Object.isFrozen(event.toolSchema));}
+ assert.ok(!JSON.stringify(f.events).includes('not-for-reporting'));
+ await assert.rejects(f.guard.run('unknown',{},{}),denied('action_not_registered'));
+ assert.equal(f.events.at(-1).toolSchema,undefined);
+ for(const toolSchema of [null,{serverId:'',hash:'a'.repeat(64)},{serverId:'server',hash:'invalid'}])assert.throws(()=>fixture({action:{toolSchema}}),/Invalid tool schema evidence/);
+});

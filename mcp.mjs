@@ -11,7 +11,7 @@ export function createProtectedMCPHandler(options) {
     if ((resource.protocol !== 'https:' && !(loopback && resource.protocol === 'http:')) || resource.pathname !== '/mcp' || resource.search || resource.hash || resource.username || resource.password || issuer.protocol !== 'https:' || issuer.search || issuer.hash || issuer.username || issuer.password)
         throw Error('Invalid MCP resource configuration');
     const metadataURL = new URL(metadataPath, resource).href;
-    const tools = Object.fromEntries(Object.entries(options.tools).map(([name, t]) => [name, { ...t, requiredScopes: [...t.requiredScopes], inputSchema: structuredClone(t.inputSchema) }]));
+    const tools = Object.fromEntries(Object.entries(options.tools).map(([name, t]) => [name, { ...t, toolSchema: undefined, requiredScopes: [...t.requiredScopes], inputSchema: structuredClone(t.inputSchema) }]));
     // Validate the closed registry at startup, not only after a client arrives.
     createActionProtection({ policyVersion: options.policyVersion, authenticate: options.authenticate, actions: tools, sharedRuntime: options.sharedRuntime });
     for (const tool of Object.values(tools))
@@ -30,6 +30,8 @@ export function createProtectedMCPHandler(options) {
     };
     const hashes = options.discovery ? Object.fromEntries(Object.entries(tools).map(([name, tool]) =>
         [name, createHash('sha256').update(canonical(JSON.parse(JSON.stringify(tool.inputSchema)))).digest('hex')])) : {};
+    if (options.discovery) for (const [name, tool] of Object.entries(tools))
+        tool.toolSchema = Object.freeze({serverId:options.discovery.serverId,hash:hashes[name]});
     const runtime = options.sharedRuntime && { ...options.sharedRuntime };
     const serverId = options.discovery?.serverId;
     const catalogReporter = options.discovery ? createReporter({

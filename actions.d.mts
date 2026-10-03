@@ -32,7 +32,10 @@ export interface ActionWork {
  /** Confirmed work after completed execution. No async/detached measurement; excess/unknown retains maximum. */
  measure?(result:unknown,context:ActionContext):number;
 }
+/** Server-supplied metadata, not proof of a verified schema or authorization. */
+export interface ToolSchemaEvidence { readonly serverId: string; readonly hash: string; }
 export interface ActionEvent {
+  readonly toolSchema?: ToolSchemaEvidence;
   /** Pseudonymous application-authenticated subject, not WebDecoy-verified agent identity. */
   readonly caller?: {readonly schema:1;readonly source:'application_auth';readonly id:string};
   readonly work?:ActionWorkEvidence;
@@ -64,6 +67,10 @@ export interface ActionRuntime {
   reportingTimeoutMs?:number;maxPendingReports?:number;
 }
 export interface ActionDefinition {
+  /** Optional non-secret server label and canonical SHA-256 schema hash. MCP discovery fills this automatically.
+   * Requires a runtime supporting tool_schema evidence; does not change admission.
+   */
+  toolSchema?: ToolSchemaEvidence;
   limits?: ActionLimits;
   requiredScopes: readonly string[];
   validate(args: ActionInput): boolean | Promise<boolean>;

@@ -95,3 +95,28 @@ test('schema hashing ignores object key order but detects schema edits',async t=
  const hashes=sink.reports.map(r=>r.tool_catalog.tools[0].schema_hash);
  assert.equal(hashes[0],hashes[1]);assert.notEqual(hashes[0],hashes[2]);
 });
+
+async function awaitReports(sink,count){
+ for(let i=0;i<200&&sink.reports.length<count;i++)await new Promise(r=>setTimeout(r,10));
+ assert.equal(sink.reports.length,count);
+}
+test('direct MCP calls carry registered server/schema before listing, including scope denials',async t=>{
+ const sink=await reportingFixture(t);const f=await fixture(t,{sharedRuntime:sink.sharedRuntime,discovery:{serverId:'records'}});
+ await result(await f.post(call('records.read')));await awaitReports(sink,2);
+ for(const r of sink.reports){assert.equal(r.schema,2);assert.equal(r.tool_action.tool_schema.server_id,'records');assert.match(r.tool_action.tool_schema.hash,/^[a-f0-9]{64}$/);}
+ assert.equal(sink.reports[0].tool_action.action_id,sink.reports[1].tool_action.action_id);
+ assert.equal(sink.reports.filter(r=>r.schema===3).length,0);
+ await result(await f.post({jsonrpc:'2.0',id:3,method:'tools/list',params:{}}));await f.flush();await awaitReports(sink,3);
+ const catalog=sink.reports.find(r=>r.schema===3);
+ assert.equal(catalog.tool_catalog.tools[0].schema_hash,sink.reports[0].tool_action.tool_schema.hash);
+ assert.equal((await f.post(call('records.export',{}))).status,403);await awaitReports(sink,4);
+ const denied=sink.reports.find(r=>r.tool_action?.outcome==='not_attempted');
+ assert.equal(denied.tool_action.name,'records.export');assert.equal(denied.tool_action.tool_schema.server_id,'records');assert.equal(f.counts().exports,0);
+ const unknown=await result(await f.post(call('caller_supplied_private_name')));assert.equal(unknown.error.code,-32602);
+ assert.ok(!JSON.stringify(sink.reports).includes('caller_supplied_private_name'));
+});
+test('MCP action schema evidence stays off without discovery',async t=>{
+ const sink=await reportingFixture(t);const f=await fixture(t,{sharedRuntime:sink.sharedRuntime});
+ await result(await f.post(call('records.read')));await awaitReports(sink,2);
+ for(const r of sink.reports)assert.equal(r.tool_action.tool_schema,undefined);
+});
