@@ -80,7 +80,7 @@ export interface ActionRuntime {
 }
 export interface ActionDefinition {
   /** Optional non-secret server label and canonical SHA-256 schema hash. MCP discovery fills this automatically.
-   * Requires a runtime supporting tool_schema evidence; does not change admission.
+   * Requires a runtime supporting tool_schema evidence. With toolPause enabled, serverId and the action name identify the control scope.
    */
   toolSchema?: ToolSchemaEvidence;
   limits?: ActionLimits;
