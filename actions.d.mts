@@ -69,6 +69,8 @@ export interface ActionLimits {
 export interface ActionRuntime {
   /** Opt in to scoped caller pseudonyms in reports. Requires a supporting runtime. Default false. */
   reportCaller?:boolean;
+  /** Opt-in online caller pause check before work. Requires reportCaller. Fails open after 250ms; no cache, retry or in-flight cancellation. */
+  callerPause?:boolean;
   webdecoyUrl:string;webdecoyKey:string;propertyId:string;subjectSecret:string;
   reportingTimeoutMs?:number;maxPendingReports?:number;
 }
