@@ -68,3 +68,15 @@ are separate records and do not expire with the evidence window. Expiring a paus
 changes enforcement state; it does not delete the audit history. A new pseudonym
 does not erase old retained records. Respect your own application identity mapping
 retention/access controls and avoid logging bearer tokens or raw tool payloads.
+
+
+## Shared conformance cases
+
+`test/fixtures/caller-contract-v1.json` is mirrored in the Go SDK's
+`testdata/caller-contract-v1.json`. Both suites dispatch the same 30 core caller
+cases and assert exact allow/denial outcomes and zero execution on denial.
+Coverage includes subject/issuer/method/tenant bounds, scope count, optional client,
+expiry, Unicode within portable limits and forged identity in action arguments.
+Language-native malformed Unicode is tested separately. This validates the shared
+core contract, not OAuth provider issuance, signed-agent identity or parity of
+optional runtime features. Language representation differences above stay explicit.
