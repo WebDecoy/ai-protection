@@ -104,3 +104,47 @@ and the [Auth0 verifier example](../auth0/README.md).
 Enforced shared-limit denials use an MCP tool error. Its `_meta["webdecoy.com/action-error"]`
 contains the reason/status and bounded `retryAfterSeconds` when available. This
 provides retry guidance without retrying a tool or rewriting an open SSE response.
+
+## Repeatable check with an already-issued Auth0 token
+
+The source command below validates an **owned** Auth0 API token with live issuer
+JWKS, then starts a temporary loopback MCP server and runs the official client.
+It never calls your production MCP server or a model. The exact API audience must
+be an HTTPS resource URI ending `/mcp` (loopback HTTP is also accepted). Set the
+issuer with a trailing slash. Use a short-lived RS256 custom-API access token with
+`records:read` and without `records:export`, for the configured test subject and
+organization. Obtain it using your existing authorized application login flow.
+This command does not perform login, consent, token exchange or token issuance.
+
+Set `AUTH0_ISSUER`, `MCP_RESOURCE`, `AUTH0_SUBJECT` and `AUTH0_ORGANIZATION` as above.
+Write the token to a local file outside this repository using your credential
+manager or other private workflow, with mode `0600`. Do not put the token on the
+command line or in an issue. Then run:
+
+```sh
+npm run build --prefix examples/mcp
+AUTH0_TOKEN_FILE=/absolute/private/path/access-token.txt node examples/mcp/verify-auth0.mjs
+```
+
+Only the token file **path** is an environment variable. Symlinks, non-regular,
+world/group-accessible and oversized files are rejected. The token is read only;
+the command does not delete or revoke it. Remove it through your credential
+workflow afterward. Failure output is generic and success prints only check names
+and synthetic callback counts; neither prints tokens or identity values.
+
+The verifier contacts the configured HTTPS issuer's fixed JWKS endpoint without
+the token. The bearer token goes only to the temporary loopback server. The server
+checks the configured subject/organization allowlist and uses the configured
+resource audience. Loopback requests carry the external resource Host; this tests
+application authorization, not production DNS, TLS or reverse-proxy configuration.
+No WebDecoy runtime key, hosted reporting, model call or application data write is
+used. Requests have five-second deadlines and responses are capped at 64 KiB;
+redirects are rejected.
+
+Checks: signature and membership, protected-resource metadata, missing credential,
+tampered signature, official-client initialization, scope-filtered listing, one
+permitted synthetic read, cross-tenant resource denial and HTTP scope challenge.
+Success requires one allowed callback and zero forbidden callbacks. CI exercises
+the same runner with generated keys and fixture JWKS. CI success **does not** mean
+a live Auth0 tenant has been verified. Record a live run separately with its
+commit, time, sanitized summary and privately maintained fixture configuration.
