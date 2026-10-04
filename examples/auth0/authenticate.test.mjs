@@ -18,3 +18,26 @@ test('invalid signature is rejected',async()=>{const other=await generateKeyPair
 test('unsigned token rejected',async()=>{const f=fixture();await assert.rejects(f.run('eyJhbGciOiJub25lIn0.e30.'),e=>e.reason==='authentication_required');assert.equal(f.calls(),0);});
 test('JWKS outage fails before tenant lookup or action',async()=>{let resolved=0;const auth=createAuth0Authenticator({issuer,audience,fetcher:async()=>new Response('',{status:503}),resolveTenant:()=>{resolved++;return 'tenant_a';}});await assert.rejects(auth(new Request('https://api.example',{headers:{authorization:'Bearer '+await signed()}})));assert.equal(resolved,0);});
 test('unexpected signing algorithm is rejected',async()=>{const token=await new SignJWT({sub:'reader',iss:issuer,aud:audience,exp:Math.floor(Date.now()/1000)+60}).setProtectedHeader({alg:'HS256'}).sign(new TextEncoder().encode('fixture-signing-secret-at-least-32-bytes'));const f=fixture();await assert.rejects(f.run(token),e=>e.reason==='authentication_required');assert.equal(f.calls(),0);});
+
+for (const [name,claims] of [
+  ['delegated actor',{act:{sub:'operator'}}],
+  ['delegation permission',{may_act:{sub:'operator'}}],
+  ['oversized subject',{sub:'a'.repeat(513)}],
+  ['oversized client',{azp:'a'.repeat(513)}],
+  ['empty client',{azp:''}],
+  ['control character in subject',{sub:'reader\u0000'}],
+  ['too many scopes',{scope:Array.from({length:65},(_,i)=>'scope'+i).join(' ')}],
+  ['invalid scope syntax',{scope:'record:read\tadmin'}],
+]) test(name+' fails before membership lookup',async()=>{
+  let lookups=0;
+  const auth=createAuth0Authenticator({issuer,audience,fetcher:async()=>Response.json({keys:[jwk]}),
+    resolveTenant:()=>{lookups++;return 'tenant_a';}});
+  await assert.rejects(auth(new Request(audience,{headers:{authorization:'Bearer '+await signed(claims)}})));
+  assert.equal(lookups,0);
+});
+test('OAuth client stays separate and unsigned agent labels never enter trusted context',async()=>{
+  const auth=createAuth0Authenticator({issuer,audience,fetcher:async()=>Response.json({keys:[jwk]}),resolveTenant:()=> 'tenant_a'});
+  const caller=await auth(new Request(audience,{headers:{authorization:'Bearer '+await signed({agent_id:'claimed-agent'}),'x-agent-id':'forged'}}));
+  assert.equal(caller.subject,'reader');assert.equal(caller.clientId,'client_a');
+  assert.equal(caller.agent_id,undefined);assert.equal(caller.signer,undefined);assert.equal(caller.delegation,undefined);
+});

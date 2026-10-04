@@ -394,3 +394,7 @@ no retry/cache; unavailable, timed-out or malformed checks fail open with explic
 evidence. Application permissions still apply before this check. Saving is not
 an acknowledgment from every instance. Exact revision evidence permits the
 dashboard to show an SDK-reported tool denial separately from saved state.
+
+## Caller identity and secret rotation
+
+See the [schema-1 caller contract](https://github.com/WebDecoy/ai-protection/blob/main/CALLER_IDENTITY.md) for authenticated/claimed/unavailable distinctions, Node/Go bounds, OAuth client separation, unsupported delegation/signers and caller pseudonym retention/rotation.
