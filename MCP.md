@@ -335,3 +335,29 @@ is normal client behavior, not an enforcement decision. Large listings are split
 into batches of up to 64 tools; each batch is a report, not a distinct listing
 count. Unattributed older catalogs are never assigned to a caller retrospectively.
 Initialization and automatic containment remain outside this feature.
+
+### Manual caller pauses (alpha.14)
+
+Enable `sharedRuntime: { ...runtimeOptions, reportCaller: true, callerPause: true }`
+on each protected server after updating the hosted receiver. An organization owner
+or admin can then open a caller timeline and review a pause or resume for that
+property. A reason is required. Pauses can expire or remain until resumed.
+Concurrent stale edits are rejected and each successful change is audited.
+
+The check runs after application permissions and before shared limits or execution,
+for each admitted tool call. It adds one network request with a 250 ms deadline,
+no retries and no decision cache. A saved pause applies to subsequent successful
+checks; a call already admitted or running is not cancelled. Resuming needs no cache
+invalidation. A restart reads current state on the next check.
+
+Outages, timeouts, malformed responses and unavailable controls fail open with
+`caller_pause_unavailable` evidence; authorization and other limits still apply.
+A saved pause is not a delivery acknowledgment and cannot guarantee enforcement
+while disconnected. This control does not revoke OAuth credentials.
+
+Scope is the existing property-scoped pseudonym derived from issuer, tenant and
+subject. Keep `subjectSecret` consistent across replicas. Rotating it changes the
+pseudonym and existing pauses no longer match. Only opt-in Node action integrations
+are covered, including this MCP adapter; Python/Go and unwrapped tools are not.
+Listings and initialization remain available; this pauses new tool execution.
+No automatic pause is applied after a decoy call.

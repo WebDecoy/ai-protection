@@ -2,6 +2,7 @@ import {prepareWork} from './work.mjs';
 import {prepareQuota,quotaHash} from './quota.mjs';
 import {prepareConcurrency} from './concurrency.mjs';
 import {validPropertyID} from './account.mjs';
+import {readJSON} from './transport.mjs';
 import {createReporter} from './reporting.mjs';
 
 export function prepareActionRuntime(options, definitions) {
@@ -13,6 +14,8 @@ export function prepareActionRuntime(options, definitions) {
     typeof config.webdecoyKey!=='string'||!config.webdecoyKey||/[^\x21-\x7e]/.test(config.webdecoyKey)||
     typeof config.subjectSecret!=='string'||!config.subjectSecret.isWellFormed()||Buffer.byteLength(config.subjectSecret)<32)throw Error('Invalid action runtime');
   if(config.reportCaller !== undefined && typeof config.reportCaller !== "boolean")throw Error("Invalid caller reporting option");
+  if(config.callerPause !== undefined && typeof config.callerPause !== 'boolean')throw Error('Invalid caller pause option');
+  if(config.callerPause && !config.reportCaller)throw Error('Caller pause requires caller reporting');
   const c={...config};const limits=new Map(),ruleIDs=new Set();
   const subject=(ctx,tenant)=>({accountId:tenant?quotaHash(c.subjectSecret,'webdecoy.actions.tenant.v1',ctx.caller.tenant):quotaHash(c.subjectSecret,'webdecoy.actions.caller.v1',ctx.caller.issuer,ctx.caller.tenant,ctx.caller.subject)});
   for(const [name,d] of definitions){
@@ -44,7 +47,25 @@ export function prepareActionRuntime(options, definitions) {
         headers:{Authorization:`Bearer ${c.webdecoyKey}`,'X-WebDecoy-Property-ID':c.propertyId,'Content-Type':'application/json'},body:JSON.stringify(payload)});
       await response.body?.cancel();if(!response.ok)throw Error('Action reporting unavailable');
     }});
-  return {limits,callerEvidence:caller=>actionCallerEvidence(c,caller),report:event=>reporter.send(event),flush:()=>reporter.flush()};
+  const checkCallerPause = c.callerPause ? async (caller,signal) => {
+    signal.throwIfAborted();const started=performance.now();
+    const check={id:'caller_pause',source:'shared',mode:'enforce',decision:'unavailable',reason:'caller_pause_unavailable',durationMs:0};
+    let denial;
+    try {
+      const id=actionCallerEvidence(c,caller).id;
+      const response=await fetch(new URL('/api/v1/sdk/ai-abuse/caller-pause',c.webdecoyUrl),{
+        method:'POST',redirect:'error',signal:AbortSignal.any([signal,AbortSignal.timeout(250)]),
+        headers:{Authorization:`Bearer ${c.webdecoyKey}`,'Content-Type':'application/json','X-WebDecoy-Property-ID':c.propertyId},body:JSON.stringify({schema:1,caller:id})
+      });
+      if(!response.ok){await response.body?.cancel();throw Error('Caller control unavailable');}
+      const value=await readJSON(response,2048);
+      if(value.schema!==1||value.property_id!==c.propertyId.toLowerCase()||value.caller!==id||typeof value.allowed!=='boolean'||value.reason!==(value.allowed?'caller_allowed':'caller_paused'))throw Error('Invalid caller control response');
+      check.decision=value.allowed?'allow':'deny';check.reason=value.reason;
+      if(!value.allowed)denial={reason:'caller_paused',status:403};
+    } catch { signal.throwIfAborted(); }
+    check.durationMs=Math.max(0,performance.now()-started);return {check,denial};
+  }:null;
+  return {limits,checkCallerPause,callerEvidence:caller=>actionCallerEvidence(c,caller),report:event=>reporter.send(event),flush:()=>reporter.flush()};
 }
 
 export function actionCallerEvidence(config,caller) {
