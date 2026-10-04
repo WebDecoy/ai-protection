@@ -1,0 +1,675 @@
+[
+  {
+    "name": "authenticated",
+    "caller": {
+      "schema": 1,
+      "subject": "reader",
+      "tenant": "tenant-a",
+      "issuer": "fixture",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "allow"
+  },
+  {
+    "name": "client-distinct",
+    "caller": {
+      "schema": 1,
+      "subject": "reader",
+      "tenant": "tenant-a",
+      "issuer": "fixture",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read"
+      ],
+      "expiresAt": 4102444800000,
+      "clientId": "oauth-client"
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "allow"
+  },
+  {
+    "name": "duplicate-scopes",
+    "caller": {
+      "schema": 1,
+      "subject": "reader",
+      "tenant": "tenant-a",
+      "issuer": "fixture",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read",
+        "read"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "allow"
+  },
+  {
+    "name": "empty-scopes",
+    "caller": {
+      "schema": 1,
+      "subject": "reader",
+      "tenant": "tenant-a",
+      "issuer": "fixture",
+      "authenticationMethod": "session",
+      "scopes": [],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "missing_scope"
+  },
+  {
+    "name": "wrong-scope",
+    "caller": {
+      "schema": 1,
+      "subject": "reader",
+      "tenant": "tenant-a",
+      "issuer": "fixture",
+      "authenticationMethod": "session",
+      "scopes": [
+        "admin"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "missing_scope"
+  },
+  {
+    "name": "wrong-tenant",
+    "caller": {
+      "schema": 1,
+      "subject": "reader",
+      "tenant": "tenant-b",
+      "issuer": "fixture",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "permission_denied"
+  },
+  {
+    "name": "forged-argument-tenant",
+    "caller": {
+      "schema": 1,
+      "subject": "reader",
+      "tenant": "tenant-b",
+      "issuer": "fixture",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a",
+      "tenant": "tenant-a",
+      "subject": "admin"
+    },
+    "reason": "permission_denied"
+  },
+  {
+    "name": "expired",
+    "caller": {
+      "schema": 1,
+      "subject": "reader",
+      "tenant": "tenant-a",
+      "issuer": "fixture",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read"
+      ],
+      "expiresAt": 1
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "authentication_required"
+  },
+  {
+    "name": "wrong-schema",
+    "caller": {
+      "schema": 2,
+      "subject": "reader",
+      "tenant": "tenant-a",
+      "issuer": "fixture",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "authentication_required"
+  },
+  {
+    "name": "subject-empty",
+    "caller": {
+      "schema": 1,
+      "subject": "",
+      "tenant": "tenant-a",
+      "issuer": "fixture",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "authentication_required"
+  },
+  {
+    "name": "subject-control",
+    "caller": {
+      "schema": 1,
+      "subject": "a\u0000b",
+      "tenant": "tenant-a",
+      "issuer": "fixture",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "authentication_required"
+  },
+  {
+    "name": "subject-oversized",
+    "caller": {
+      "schema": 1,
+      "subject": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "tenant": "tenant-a",
+      "issuer": "fixture",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "authentication_required"
+  },
+  {
+    "name": "tenant-empty",
+    "caller": {
+      "schema": 1,
+      "subject": "reader",
+      "tenant": "",
+      "issuer": "fixture",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "authentication_required"
+  },
+  {
+    "name": "tenant-control",
+    "caller": {
+      "schema": 1,
+      "subject": "reader",
+      "tenant": "a\u0000b",
+      "issuer": "fixture",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "authentication_required"
+  },
+  {
+    "name": "tenant-oversized",
+    "caller": {
+      "schema": 1,
+      "subject": "reader",
+      "tenant": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "issuer": "fixture",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "authentication_required"
+  },
+  {
+    "name": "issuer-empty",
+    "caller": {
+      "schema": 1,
+      "subject": "reader",
+      "tenant": "tenant-a",
+      "issuer": "",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "authentication_required"
+  },
+  {
+    "name": "issuer-control",
+    "caller": {
+      "schema": 1,
+      "subject": "reader",
+      "tenant": "tenant-a",
+      "issuer": "a\u0000b",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "authentication_required"
+  },
+  {
+    "name": "issuer-oversized",
+    "caller": {
+      "schema": 1,
+      "subject": "reader",
+      "tenant": "tenant-a",
+      "issuer": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "authentication_required"
+  },
+  {
+    "name": "authenticationMethod-empty",
+    "caller": {
+      "schema": 1,
+      "subject": "reader",
+      "tenant": "tenant-a",
+      "issuer": "fixture",
+      "authenticationMethod": "",
+      "scopes": [
+        "read"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "authentication_required"
+  },
+  {
+    "name": "authenticationMethod-control",
+    "caller": {
+      "schema": 1,
+      "subject": "reader",
+      "tenant": "tenant-a",
+      "issuer": "fixture",
+      "authenticationMethod": "a\u0000b",
+      "scopes": [
+        "read"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "authentication_required"
+  },
+  {
+    "name": "authenticationMethod-oversized",
+    "caller": {
+      "schema": 1,
+      "subject": "reader",
+      "tenant": "tenant-a",
+      "issuer": "fixture",
+      "authenticationMethod": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "scopes": [
+        "read"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "authentication_required"
+  },
+  {
+    "name": "ascii-boundary",
+    "caller": {
+      "schema": 1,
+      "subject": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "tenant": "tenant-a",
+      "issuer": "fixture",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "allow"
+  },
+  {
+    "name": "unicode-byte-boundary",
+    "caller": {
+      "schema": 1,
+      "subject": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+      "tenant": "tenant-a",
+      "issuer": "fixture",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "allow"
+  },
+  {
+    "name": "emoji-byte-boundary",
+    "caller": {
+      "schema": 1,
+      "subject": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "tenant": "tenant-a",
+      "issuer": "fixture",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "allow"
+  },
+  {
+    "name": "client-control",
+    "caller": {
+      "schema": 1,
+      "subject": "reader",
+      "tenant": "tenant-a",
+      "issuer": "fixture",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read"
+      ],
+      "expiresAt": 4102444800000,
+      "clientId": "a\nb"
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "authentication_required"
+  },
+  {
+    "name": "client-oversized",
+    "caller": {
+      "schema": 1,
+      "subject": "reader",
+      "tenant": "tenant-a",
+      "issuer": "fixture",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read"
+      ],
+      "expiresAt": 4102444800000,
+      "clientId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "authentication_required"
+  },
+  {
+    "name": "scope-control",
+    "caller": {
+      "schema": 1,
+      "subject": "reader",
+      "tenant": "tenant-a",
+      "issuer": "fixture",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read",
+        "a\nb"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "authentication_required"
+  },
+  {
+    "name": "scope-oversized",
+    "caller": {
+      "schema": 1,
+      "subject": "reader",
+      "tenant": "tenant-a",
+      "issuer": "fixture",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "authentication_required"
+  },
+  {
+    "name": "64-scopes",
+    "caller": {
+      "schema": 1,
+      "subject": "reader",
+      "tenant": "tenant-a",
+      "issuer": "fixture",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "allow"
+  },
+  {
+    "name": "65-scopes",
+    "caller": {
+      "schema": 1,
+      "subject": "reader",
+      "tenant": "tenant-a",
+      "issuer": "fixture",
+      "authenticationMethod": "session",
+      "scopes": [
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read",
+        "read"
+      ],
+      "expiresAt": 4102444800000
+    },
+    "arguments": {
+      "record": "a"
+    },
+    "reason": "authentication_required"
+  }
+]
