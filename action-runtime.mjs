@@ -44,5 +44,9 @@ export function prepareActionRuntime(options, definitions) {
         headers:{Authorization:`Bearer ${c.webdecoyKey}`,'X-WebDecoy-Property-ID':c.propertyId,'Content-Type':'application/json'},body:JSON.stringify(payload)});
       await response.body?.cancel();if(!response.ok)throw Error('Action reporting unavailable');
     }});
-  return {limits,callerEvidence:caller=>c.reportCaller?Object.freeze({schema:1,source:'application_auth',id:quotaHash(c.subjectSecret,'webdecoy.actions.evidence.caller.v1',c.propertyId.toLowerCase(),caller.issuer,caller.tenant,caller.subject)}):undefined,report:event=>reporter.send(event),flush:()=>reporter.flush()};
+  return {limits,callerEvidence:caller=>actionCallerEvidence(c,caller),report:event=>reporter.send(event),flush:()=>reporter.flush()};
+}
+
+export function actionCallerEvidence(config,caller) {
+  return config.reportCaller?Object.freeze({schema:1,source:'application_auth',id:quotaHash(config.subjectSecret,'webdecoy.actions.evidence.caller.v1',config.propertyId.toLowerCase(),caller.issuer,caller.tenant,caller.subject)}):undefined;
 }

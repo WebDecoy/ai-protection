@@ -1,6 +1,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { actionCallerEvidence } from './action-runtime.mjs';
 import { createActionProtection, ActionDenied } from './actions.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import { createReporter } from './reporting.mjs';
@@ -54,12 +55,12 @@ export function createProtectedMCPHandler(options) {
     const catalogReporter = options.discovery ? createReporter({
         reportingTimeoutMs: runtime.reportingTimeoutMs ?? 1000,
         maxPendingReports: runtime.maxPendingReports ?? 100,
-        onObservation: async (names, { signal }) => {
+        onObservation: async ({names,caller}, { signal }) => {
             const response = await fetch(new URL('/api/v1/sdk/ai-abuse/reports', runtime.webdecoyUrl), {
                 method: 'POST', redirect: 'error', signal,
                 headers: { Authorization: `Bearer ${runtime.webdecoyKey}`, 'X-WebDecoy-Property-ID': runtime.propertyId, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ schema: 3, request_id: randomUUID(), timestamp: new Date().toISOString(), action: 'tool_discovery',
-                    tool_catalog: { server_id: serverId, source: 'tools_list', tools: names.map(name => ({ name, schema_hash: hashes[name], effect: tools[name].toolSchema.effect, permissions: tools[name].toolSchema.permissions, ...(decoys.has(name)?{decoy:decoys.get(name)}:{}) })) } })
+                    tool_catalog: { server_id: serverId, source: 'tools_list', ...(caller?{caller}:{}), tools: names.map(name => ({ name, schema_hash: hashes[name], effect: tools[name].toolSchema.effect, permissions: tools[name].toolSchema.permissions, ...(decoys.has(name)?{decoy:decoys.get(name)}:{}) })) } })
             });
             await response.body?.cancel();
             if (!response.ok) throw Error('Discovery reporting unavailable');
@@ -214,7 +215,7 @@ export function createProtectedMCPHandler(options) {
             res.once('close', () => { void server.close().catch(() => { }); });
             server.setRequestHandler(ListToolsRequestSchema, async () => {
                 const visible = Object.entries(tools).filter(([name, tool]) => decoys.get(name) !== 'unadvertised' && tool.requiredScopes.every(s => caller.scopes.includes(s)));
-                for (let i=0;i<visible.length;i+=64) void catalogReporter?.send(visible.slice(i,i+64).map(([name]) => name));
+                for (let i=0;i<Math.max(1,visible.length);i+=64) void catalogReporter?.send({names:visible.slice(i,i+64).map(([name]) => name),caller:runtime? actionCallerEvidence(runtime,caller):undefined});
                 return { tools: visible.map(([name, tool]) => ({ name, description: tool.description, inputSchema: tool.inputSchema, ...(tool.annotations ? {annotations:tool.annotations} : {}) })) };
             });
             server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
