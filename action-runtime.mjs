@@ -15,6 +15,8 @@ export function prepareActionRuntime(options, definitions) {
     typeof config.subjectSecret!=='string'||!config.subjectSecret.isWellFormed()||Buffer.byteLength(config.subjectSecret)<32)throw Error('Invalid action runtime');
   if(config.reportCaller !== undefined && typeof config.reportCaller !== "boolean")throw Error("Invalid caller reporting option");
   if(config.callerPause !== undefined && typeof config.callerPause !== 'boolean')throw Error('Invalid caller pause option');
+  if(config.toolPause !== undefined && typeof config.toolPause !== 'boolean')throw Error('Invalid tool pause option');
+  if(config.toolPause && [...definitions.values()].some(d=>!d.toolSchema))throw Error('Tool pause requires toolSchema on every action');
   if(config.callerPause && !config.reportCaller)throw Error('Caller pause requires caller reporting');
   const pauseTimeout=config.callerPauseTimeoutMs??1000;
   if(!Number.isInteger(pauseTimeout)||pauseTimeout<1||pauseTimeout>10000)throw Error('Invalid caller pause timeout');
@@ -70,7 +72,35 @@ export function prepareActionRuntime(options, definitions) {
     } catch { signal.throwIfAborted(); }
     check.durationMs=Math.max(0,performance.now()-started);return {check,denial};
   }:null;
-  return {limits,checkCallerPause,callerEvidence:caller=>actionCallerEvidence(c,caller),report:event=>reporter.send(event),flush:()=>reporter.flush()};
+  const checkToolPause = c.toolPause ? async (caller,name,toolSchema,signal) => {
+    signal.throwIfAborted();const started=performance.now();
+    const kinds=c.callerPause?['caller','tool']:['tool'];
+    let checks=kinds.map(kind=>({id:kind+'_pause',source:'shared',mode:'enforce',decision:'unavailable',reason:kind+'_pause_unavailable',durationMs:0})),denial;
+    try {
+      const id=c.callerPause?actionCallerEvidence(c,caller).id:'';
+      const response=await fetch(new URL('/api/v1/sdk/ai-abuse/caller-pause',c.webdecoyUrl),{
+        method:'POST',redirect:'error',signal:AbortSignal.any([signal,AbortSignal.timeout(pauseTimeout)]),
+        headers:{Authorization:`Bearer ${c.webdecoyKey}`,'Content-Type':'application/json','X-WebDecoy-Property-ID':c.propertyId},
+        body:JSON.stringify({schema:2,caller:id,server_id:toolSchema.serverId,tool:name})
+      });
+      if(!response.ok){await response.body?.cancel();throw Error('Tool control unavailable');}
+      const value=await readJSON(response,4096);
+      if(value.schema!==2||value.property_id!==c.propertyId.toLowerCase()||value.caller!==id||value.server_id!==toolSchema.serverId||value.tool!==name||(!c.callerPause&&value.caller_control!==null))throw Error('Invalid tool control response');
+      // Validate the entire combined response before accepting either decision.
+      const checked=kinds.map(kind=>{
+        const control=value[kind+'_control'];
+        if(!control||typeof control.allowed!=='boolean'||control.reason!==kind+(control.allowed?'_allowed':'_paused')||
+          (control.control_revision!=null&&!validPropertyID(control.control_revision)))throw Error('Invalid control evidence');
+        return {id:kind+'_pause',source:'shared',mode:'enforce',decision:control.allowed?'allow':'deny',reason:control.reason,durationMs:0,
+          ...(control.control_revision?{controlRevision:control.control_revision.toLowerCase()}:{})};
+      });
+      checks=checked;const denied=checks.find(check=>check.decision==='deny');
+      if(denied)denial={reason:denied.reason,status:403};
+    } catch {signal.throwIfAborted();}
+    const durationMs=Math.max(0,performance.now()-started);
+    return {checks:checks.map(check=>({...check,durationMs})),denial};
+  }:null;
+  return {limits,checkCallerPause,checkToolPause,callerEvidence:caller=>actionCallerEvidence(c,caller),report:event=>reporter.send(event),flush:()=>reporter.flush()};
 }
 
 export function actionCallerEvidence(config,caller) {
