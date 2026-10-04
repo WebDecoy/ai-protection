@@ -19,6 +19,10 @@ jobs:
           package-manager-cache: false
       - run: npm ci
       - run: npm test
+      - run: npm run test:workers
+      - run: npm exec -- wrangler deploy --dry-run --config examples/workers/wrangler.toml
+        env:
+          WRANGLER_SEND_METRICS: "false"
       - run: npm run test:types
       - run: npm run check:package
       - run: npm ci

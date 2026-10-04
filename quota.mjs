@@ -48,7 +48,7 @@ export function prepareQuota(options) {
        signal.throwIfAborted();
        try {
       const response=await fetch(new URL('/api/v1/sdk/ai-abuse/quota',webdecoyUrl),{
-        method:'POST',redirect:'error',signal:AbortSignal.any([signal,AbortSignal.timeout(q.timeoutMs)]),
+        method:'POST',redirect:'manual',signal:AbortSignal.any([signal,AbortSignal.timeout(q.timeoutMs)]),
         headers:{Authorization:`Bearer ${webdecoyKey}`,'Content-Type':'application/json','X-WebDecoy-Property-ID':propertyId},body:JSON.stringify(payload)
       });
       if(!response.ok){await response.body?.cancel();const error=Error('Quota unavailable');error.terminal=response.status<500;throw error;}

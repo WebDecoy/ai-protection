@@ -13,8 +13,8 @@ Browser → customer's /api/chat → existing auth / input checks
 ```
 
 Install in the application server that owns the model call, not the browser,
-Next.js middleware, or the model provider. Node >=22.22.3 is required; Edge runtime
-is not supported. The application and provider traffic remain on customer
+Next.js middleware, or the model provider. Node >=22.22.3 is required; Next.js Edge runtime
+is not supported. For the experimental Cloudflare Workers adapter, use [the Workers guide](WORKERS.md). The application and provider traffic remain on customer
 infrastructure. WebDecoy receives the client IP, URL pathname (no query string),
 method, user agent, header names and accept-language/accept-encoding values.
 Request bodies, session cookies, authorization values and responses are not sent

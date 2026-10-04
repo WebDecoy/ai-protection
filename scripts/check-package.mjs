@@ -7,7 +7,7 @@ const root = new URL('..', import.meta.url);
 const dir = mkdtempSync(join(tmpdir(), 'webdecoy-ai-package-'));
 try {
   const [pack] = JSON.parse(execFileSync('npm', ['pack','--dry-run=false','--json','--ignore-scripts','--pack-destination',dir], {cwd:root,encoding:'utf8'}));
-  const expected = ['tool-effects.mjs','WORK.md','work.mjs','mcp.mjs','mcp.d.mts','MCP.md','action-runtime.mjs','actions.mjs','actions.d.mts','ARCHITECTURE.md','NOTICE','LICENSE','NEXTJS.md','README.md','account.mjs','admission.mjs','fetch.d.mts','fetch.mjs','observation.mjs','package.json','rules.mjs','reporting.mjs','telemetry.mjs','quota.mjs','concurrency.mjs','budget.mjs','browser.mjs','browser.d.mts','browser-evidence.mjs','usage.mjs','transport.mjs'];
+  const expected = ['tool-effects.mjs','WORK.md','work.mjs','mcp.mjs','mcp.d.mts','MCP.md','action-runtime.mjs','actions.mjs','actions.d.mts','ARCHITECTURE.md','NOTICE','LICENSE','NEXTJS.md','README.md','account.mjs','admission.mjs','fetch.d.mts','fetch.mjs','observation.mjs','package.json','rules.mjs','reporting.mjs','telemetry.mjs','quota.mjs','concurrency.mjs','budget.mjs','browser.mjs','browser.d.mts','browser-evidence.mjs','usage.mjs','transport.mjs','workers.mjs','workers.d.mts','WORKERS.md'];
   assert.deepEqual(pack.files.map(f=>f.path).sort(),expected.sort(), 'Unexpected package contents');
   const manifest=JSON.parse(execFileSync('tar',['-xOf',join(dir,pack.filename),'package/package.json'],{encoding:'utf8'}));
   assert.notEqual(manifest.private,true,'Release must be publishable');
@@ -24,8 +24,10 @@ try {
   execFileSync('npm',['install','--dry-run=false','--ignore-scripts','--no-audit','--no-fund',join(dir,pack.filename)],{cwd:consumer,stdio:'pipe'});
   assert.equal(existsSync(join(consumer,'node_modules/@modelcontextprotocol/sdk')),false,'Core consumers must not install the MCP peer automatically');
   execFileSync(process.execPath,['--input-type=module','-e',
-    "import {createActionProtection} from '@webdecoy/ai-protection/actions'; if(typeof createActionProtection!=='function')throw Error('Missing actions export'); import {prepareBrowserEvidence} from '@webdecoy/ai-protection/browser'; if(typeof prepareBrowserEvidence!=='function')throw Error('Missing browser export'); import {createAIProtection as root} from '@webdecoy/ai-protection'; import {createAIProtection as subpath} from '@webdecoy/ai-protection/fetch'; if(typeof root!=='function'||root!==subpath)throw Error('Invalid exports');"],{cwd:consumer,stdio:'pipe'});
+    "import {createWorkerAIProtection} from '@webdecoy/ai-protection/workers'; if(typeof createWorkerAIProtection!=='function')throw Error('Missing Workers export'); import {createActionProtection} from '@webdecoy/ai-protection/actions'; if(typeof createActionProtection!=='function')throw Error('Missing actions export'); import {prepareBrowserEvidence} from '@webdecoy/ai-protection/browser'; if(typeof prepareBrowserEvidence!=='function')throw Error('Missing browser export'); import {createAIProtection as root} from '@webdecoy/ai-protection'; import {createAIProtection as subpath} from '@webdecoy/ai-protection/fetch'; if(typeof root!=='function'||root!==subpath)throw Error('Invalid exports');"],{cwd:consumer,stdio:'pipe'});
   console.log(`Verified ${pack.filename}: exact file allowlist and isolated consumer imports.`);
+  process.stdout.write(execFileSync(process.execPath, ['--test',new URL('../test/workers/runtime.test.mjs',import.meta.url).pathname], {cwd:consumer,env:{...process.env,WEBDECOY_WORKERS_PACKAGE_DIR:join(consumer,'node_modules/@webdecoy/ai-protection')},encoding:'utf8'}));
+  console.log('Verified packed Workers adapter in workerd.');
   // Test the tarball's transport using a real MCP client, without repository imports.
   execFileSync('npm',['install','--ignore-scripts','--no-audit','--no-fund','@modelcontextprotocol/sdk@1.31.0','jose@6.2.12','@types/node@22.19.15'],{cwd:consumer,stdio:'pipe'});
   writeFileSync(join(consumer,'authenticate.mjs'),readFileSync(new URL('../examples/auth0/authenticate.mjs',import.meta.url)));

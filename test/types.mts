@@ -54,3 +54,22 @@ const weightedActions=createActionProtection({policyVersion:'weighted_v1',authen
  limits:{work:{ruleId:'search_work',maxUnits:11,windowSeconds:60,limits:{caller:22,tenant:44,tool:88},measure:result=>typeof result==='number'?result:11},tenantConcurrency:{ruleId:'tenant_search',accountLimit:2,featureLimit:10}},
  execute:({work})=>work!.maxUnits}}});
 void weightedActions.run('search',{},null);
+
+import {createWorkerAIProtection} from '../workers.mjs';
+const workerRequest = new Request('https://example.test/chat');
+const workerCtx = {waitUntil(_task: Promise<unknown>) {}};
+const worker = createWorkerAIProtection(workerRequest, base, workerCtx);
+void worker(() => new Response());
+void worker.check();
+const typedWorker = createWorkerAIProtection<{id:string}>(workerRequest, {
+ ...base, rules:[{id:'member',evaluate:context=>({allowed:context.id.length>0})}]
+}, workerCtx);
+void typedWorker(()=>new Response(),{id:'trusted'});
+// @ts-expect-error Typed Worker context is required.
+void typedWorker.check();
+// @ts-expect-error Workers concurrency has not been validated.
+createWorkerAIProtection(workerRequest, {...base, concurrency:{ruleId:'chat'}}, workerCtx);
+// @ts-expect-error Worker lifecycle hook is supplied by the adapter.
+createWorkerAIProtection(workerRequest, {...base, waitUntil:()=>{}}, workerCtx);
+// @ts-expect-error Request is bound during construction.
+void worker(workerRequest,()=>new Response());

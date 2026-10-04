@@ -6,9 +6,10 @@
   },
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "prepublishOnly": "npm test && npm run test:types && npm run check:package",
+    "prepublishOnly": "npm test && npm run test:workers && npm run test:types && npm run check:package",
     "check:package": "node scripts/check-package.mjs",
-    "test:types": "tsc --strict --noEmit --module nodenext --target es2022 test/types.mts test/mcp-types.mts"
+    "test:types": "tsc --strict --noEmit --module nodenext --target es2022 test/types.mts test/mcp-types.mts",
+    "test:workers": "node --test test/workers/*.test.mjs"
   },
   "version": "0.1.0-alpha.12",
   "exports": {
@@ -31,6 +32,10 @@
     "./mcp": {
       "types": "./mcp.d.mts",
       "import": "./mcp.mjs"
+    },
+    "./workers": {
+      "types": "./workers.d.mts",
+      "import": "./workers.mjs"
     }
   },
   "files": [
@@ -63,9 +68,12 @@
     "MCP.md",
     "work.mjs",
     "WORK.md",
-    "tool-effects.mjs"
+    "tool-effects.mjs",
+    "workers.mjs",
+    "workers.d.mts",
+    "WORKERS.md"
   ],
-  "description": "Bot and abuse protection for AI-powered applications. Server-side request admission for Node.js.",
+  "description": "Bot and abuse protection for AI-powered applications. Request admission for Node.js and experimental Cloudflare Workers.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -89,7 +97,10 @@
   "devDependencies": {
     "typescript": "6.0.3",
     "@modelcontextprotocol/sdk": "1.31.0",
-    "@types/node": "22.19.15"
+    "@types/node": "22.19.15",
+    "esbuild": "^0.28.2",
+    "miniflare": "^4.20260730.0",
+    "wrangler": "^4.147.0"
   },
   "peerDependencies": {
     "@modelcontextprotocol/sdk": "1.31.0"

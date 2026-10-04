@@ -13,7 +13,7 @@ export function createAccountBinding({webdecoyUrl, webdecoyKey, propertyId, dete
       let next = {status:'unavailable', enforce:false};
       try {
         const response = await fetch(new URL('/api/v1/sdk/ai-abuse/config', webdecoyUrl), {
-          headers:{Authorization:`Bearer ${webdecoyKey}`}, redirect:'error',
+          headers:{Authorization:`Bearer ${webdecoyKey}`}, redirect:'manual',
           signal:AbortSignal.any([signal, AbortSignal.timeout(detectorTimeoutMs)])
         });
         if (!response.ok) { await response.body?.cancel(); throw new Error('account_unavailable'); }
