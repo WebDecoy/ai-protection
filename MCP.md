@@ -372,3 +372,25 @@ the revision; enforcement still works but revision feedback remains unknown.
 Report delivery is best effort and requires the normal reporting queue/flush.
 This evidence is not acknowledgment from every replica, provider revocation, or
 independent proof of execution. Outage behavior remains fail open.
+
+### Per-tool pauses (alpha.16)
+
+Enable `sharedRuntime.toolPause: true` after updating the hosted runtime. Tool
+pauses cover the exact property, configured server ID and action/tool name,
+across callers and schema versions. MCP supplies tool metadata automatically;
+plain action integrations must provide `toolSchema` on every action. Renaming a
+server/tool changes this identity; an old pause does not cover the new name.
+Tool-only checks do not require `reportCaller` or send a caller pseudonym.
+
+Owners/admins manage a tool pause in AI Protection, with an explicit scope
+review, reason, expiry and audit history. Saved controls remain listed even if
+the tool disappears from recent inventory. Other server/tool names stay active.
+The tool remains discoverable; work already admitted is not cancelled.
+
+When both `callerPause` and `toolPause` are enabled, they share one online request
+and both checks are reported. Caller denial takes precedence if both deny.
+`callerPauseTimeoutMs` controls the shared deadline (default 1000 ms). There is
+no retry/cache; unavailable, timed-out or malformed checks fail open with explicit
+evidence. Application permissions still apply before this check. Saving is not
+an acknowledgment from every instance. Exact revision evidence permits the
+dashboard to show an SDK-reported tool denial separately from saved state.

@@ -71,14 +71,16 @@ export interface ActionRuntime {
   reportCaller?:boolean;
   /** Opt-in online caller pause check before work. Requires reportCaller. Fails open on timeout (default 1000ms); no cache, retry or in-flight cancellation. */
   callerPause?:boolean;
-  /** Caller-pause RPC deadline, 1–10000ms; default 1000ms. Short deadlines can fail open during cold authentication. */
+  /** Opt-in tool pause by property/server/name across callers and schema versions. Requires toolSchema on each action; no caller reporting required. Combines with callerPause in one RPC and fails open on unavailable controls. */
+  toolPause?:boolean;
+  /** Caller/tool-pause RPC deadline, 1–10000ms; default 1000ms. Short deadlines can fail open during cold authentication. */
   callerPauseTimeoutMs?:number;
   webdecoyUrl:string;webdecoyKey:string;propertyId:string;subjectSecret:string;
   reportingTimeoutMs?:number;maxPendingReports?:number;
 }
 export interface ActionDefinition {
   /** Optional non-secret server label and canonical SHA-256 schema hash. MCP discovery fills this automatically.
-   * Requires a runtime supporting tool_schema evidence; does not change admission.
+   * Requires a runtime supporting tool_schema evidence. With toolPause enabled, serverId and the action name identify the control scope.
    */
   toolSchema?: ToolSchemaEvidence;
   limits?: ActionLimits;

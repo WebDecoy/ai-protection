@@ -133,7 +133,10 @@ export function createActionProtection(options) {
       // Shared limits run only after application permission checks. Their own
       // RPC deadlines are separate from local admission and detector availability.
       clearTimeout(timer);
-      if(runtime?.checkCallerPause){
+      if(runtime?.checkToolPause){
+        const r=await runtime.checkToolPause(caller,name,action.toolSchema,admissionSignal);checks.push(...r.checks);
+        if(r.denial)deny(r.denial.reason,r.denial.status);
+      }else if(runtime?.checkCallerPause){
         const r=await runtime.checkCallerPause(caller,admissionSignal);checks.push(r.check);
         if(r.denial)deny(r.denial.reason,r.denial.status);
       }
