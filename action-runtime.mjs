@@ -16,6 +16,8 @@ export function prepareActionRuntime(options, definitions) {
   if(config.reportCaller !== undefined && typeof config.reportCaller !== "boolean")throw Error("Invalid caller reporting option");
   if(config.callerPause !== undefined && typeof config.callerPause !== 'boolean')throw Error('Invalid caller pause option');
   if(config.callerPause && !config.reportCaller)throw Error('Caller pause requires caller reporting');
+  const pauseTimeout=config.callerPauseTimeoutMs??1000;
+  if(!Number.isInteger(pauseTimeout)||pauseTimeout<1||pauseTimeout>10000)throw Error('Invalid caller pause timeout');
   const c={...config};const limits=new Map(),ruleIDs=new Set();
   const subject=(ctx,tenant)=>({accountId:tenant?quotaHash(c.subjectSecret,'webdecoy.actions.tenant.v1',ctx.caller.tenant):quotaHash(c.subjectSecret,'webdecoy.actions.caller.v1',ctx.caller.issuer,ctx.caller.tenant,ctx.caller.subject)});
   for(const [name,d] of definitions){
@@ -54,7 +56,7 @@ export function prepareActionRuntime(options, definitions) {
     try {
       const id=actionCallerEvidence(c,caller).id;
       const response=await fetch(new URL('/api/v1/sdk/ai-abuse/caller-pause',c.webdecoyUrl),{
-        method:'POST',redirect:'error',signal:AbortSignal.any([signal,AbortSignal.timeout(250)]),
+        method:'POST',redirect:'error',signal:AbortSignal.any([signal,AbortSignal.timeout(pauseTimeout)]),
         headers:{Authorization:`Bearer ${c.webdecoyKey}`,'Content-Type':'application/json','X-WebDecoy-Property-ID':c.propertyId},body:JSON.stringify({schema:1,caller:id})
       });
       if(!response.ok){await response.body?.cancel();throw Error('Caller control unavailable');}

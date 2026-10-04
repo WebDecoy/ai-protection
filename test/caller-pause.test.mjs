@@ -14,7 +14,7 @@ async function fixture(t){
  res.setHeader('Content-Type','application/json');res.end(JSON.stringify({schema:1,property_id:property,caller:body.caller,allowed,reason:allowed?'caller_allowed':'caller_paused'}));
  });await new Promise(r=>server.listen(0,'127.0.0.1',r));
  t.after(()=>{server.closeAllConnections();return new Promise(r=>server.close(r));});
- const config={webdecoyUrl:`http://127.0.0.1:${server.address().port}`,webdecoyKey:'fixture',propertyId:property,subjectSecret:'s'.repeat(32),reportCaller:true,callerPause:true};
+ const config={webdecoyUrl:`http://127.0.0.1:${server.address().port}`,webdecoyKey:'fixture',propertyId:property,subjectSecret:'s'.repeat(32),reportCaller:true,callerPause:true,callerPauseTimeoutMs:250};
  let executed=0;const guard=createActionProtection({policyVersion:'v1',sharedRuntime:config,authenticate:subject=>identity(subject),actions:{read:{requiredScopes:[],validate:()=>true,authorize:()=>true,execute:()=>++executed}}});
  return {guard,config,reports,checks,calls:()=>executed,resume:()=>paused=false,pause:()=>paused=true,break:()=>broken=true,slow:()=>slow=true};
 }
@@ -37,4 +37,9 @@ test('saving a pause does not cancel already running work',async t=>{
  const guard=createActionProtection({policyVersion:'v1',sharedRuntime:f.config,authenticate:()=>identity('blocked'),actions:{read:{requiredScopes:[],validate:()=>true,authorize:()=>true,execute:()=>{started();return new Promise(r=>finish=r);}}}});
  const running=guard.run('read',{},null);await began;f.pause();
  await assert.rejects(guard.run('read',{},null),e=>e.reason==='caller_paused');finish('completed');assert.equal(await running,'completed');await guard.flush();
+});
+
+test('caller-pause timeout rejects invalid configuration',async t=>{
+ const f=await fixture(t);
+ for(const timeout of [0,-1,10001,NaN,'1000'])assert.throws(()=>createActionProtection({policyVersion:'v1',authenticate:()=>identity('x'),sharedRuntime:{...f.config,callerPauseTimeoutMs:timeout},actions:{read:{requiredScopes:[],validate:()=>true,authorize:()=>true,execute:()=>1}}}),/Invalid caller pause timeout/);
 });
