@@ -80,3 +80,33 @@ expiry, Unicode within portable limits and forged identity in action arguments.
 Language-native malformed Unicode is tested separately. This validates the shared
 core contract, not OAuth provider issuance, signed-agent identity or parity of
 optional runtime features. Language representation differences above stay explicit.
+
+## Alpha scope decision: delegation and signers
+
+Alpha supports an application-authenticated subject, canonical tenant, scopes and
+optional OAuth client. It does not interpret token-exchange actor chains, establish
+an agent brand's identity or issue credentials. Delegation and agent signer evidence
+are **unavailable** in schema 1. A claimed label remains untrusted application data.
+No additional verification boolean can turn that label into authority.
+
+The Auth0 reference verifier rejects `act` and `may_act`; other application verifiers
+must make the same scope decision explicitly. Existing scopes can restrict a
+credential, but do not establish an actor chain. No scope, signer or client field
+can override application membership or resource ownership. This is a product
+boundary for Alpha, not a claim that delegated access is implemented.
+
+Revisit actor-chain support for a concrete customer using token exchange. Required
+work would include separate actor/subject identities, trusted issuer relationships,
+chain bounds, audience restrictions, per-actor permissions, revocation semantics
+and denial tests for substituted actors/tenants. Revisit signer evidence only with
+a concrete signing protocol and original-request verification, replay protection
+and key lifecycle. Both require a versioned contract and Node/Go conformance before
+being advertised; adding optional display labels alone is insufficient.
+
+Basis: [RFC 8693](https://www.rfc-editor.org/rfc/rfc8693.html#section-4.1) distinguishes
+actor identity from the top-level subject; it leaves deployment trust policy to the
+implementation. [Auth0 access-token validation](https://auth0.com/docs/secure/tokens/access-tokens/validate-access-tokens)
+requires signature/claims, target audience and permissions checks.
+[MCP authorization](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization)
+binds access tokens to the intended resource. These standards support the boundary;
+they are not evidence that WebDecoy has implemented delegation or signer verification.
