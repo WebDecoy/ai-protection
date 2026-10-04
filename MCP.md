@@ -361,3 +361,14 @@ pseudonym and existing pauses no longer match. Only opt-in Node action integrati
 are covered, including this MCP adapter; Python/Go and unwrapped tools are not.
 Listings and initialization remain available; this pauses new tool execution.
 No automatic pause is applied after a decoy call.
+
+#### Pause feedback (alpha.15)
+
+The SDK includes the runtime's control revision in action check reports when
+available. The dashboard can then distinguish a saved pause from an SDK-reported
+denial for that exact revision, with server receipt time and request ID. Delayed
+reports from an earlier pause do not confirm a later save. Older runtimes omit
+the revision; enforcement still works but revision feedback remains unknown.
+Report delivery is best effort and requires the normal reporting queue/flush.
+This evidence is not acknowledgment from every replica, provider revocation, or
+independent proof of execution. Outage behavior remains fail open.

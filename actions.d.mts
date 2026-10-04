@@ -48,7 +48,7 @@ export interface ActionEvent {
   readonly schema: 1;
   readonly eventId: string;
   readonly timestamp: string;
-  readonly checks: readonly {id:string;source:string;mode:string;decision:string;reason:string;durationMs:number}[];
+  readonly checks: readonly {id:string;source:string;mode:string;decision:string;reason:string;durationMs:number;controlRevision?:string}[];
   readonly actionId: string;
   readonly action: string;
   readonly policyVersion: string;

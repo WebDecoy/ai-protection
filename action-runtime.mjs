@@ -40,7 +40,7 @@ export function prepareActionRuntime(options, definitions) {
   const reporter=createReporter({reportingTimeoutMs:c.reportingTimeoutMs??1000,maxPendingReports:c.maxPendingReports??100,
     onObservation:async(event,{signal})=>{
       const checks=[{id:'action_boundary',source:'local',mode:'enforce',decision:event.decision,reason:event.reason,duration_ms:0},
-        ...event.checks.map(check=>({id:check.id,source:check.source,mode:check.mode,decision:check.decision,reason:check.reason,duration_ms:check.durationMs}))];
+        ...event.checks.map(check=>({id:check.id,source:check.source,mode:check.mode,decision:check.decision,reason:check.reason,duration_ms:check.durationMs,...(check.controlRevision?{control_revision:check.controlRevision}:{})}))];
       const payload={schema:2,request_id:event.eventId,timestamp:event.timestamp,decision:event.decision,reason:event.reason,
         degraded:event.checks.some(c=>c.decision==='unavailable'),checks,handler_attempted:event.attempted,
         action:event.decision==='deny'?'denied':event.outcome==='unknown'?'handler_error':'forwarded',
@@ -62,7 +62,10 @@ export function prepareActionRuntime(options, definitions) {
       if(!response.ok){await response.body?.cancel();throw Error('Caller control unavailable');}
       const value=await readJSON(response,2048);
       if(value.schema!==1||value.property_id!==c.propertyId.toLowerCase()||value.caller!==id||typeof value.allowed!=='boolean'||value.reason!==(value.allowed?'caller_allowed':'caller_paused'))throw Error('Invalid caller control response');
+      // Older runtimes omit revision evidence. Never invent it from receipt time.
+      if(value.control_revision != null && (!validPropertyID(value.control_revision)||value.control_revision==='00000000-0000-0000-0000-000000000000'))throw Error('Invalid caller control revision');
       check.decision=value.allowed?'allow':'deny';check.reason=value.reason;
+      if(value.control_revision != null)check.controlRevision=value.control_revision.toLowerCase();
       if(!value.allowed)denial={reason:'caller_paused',status:403};
     } catch { signal.throwIfAborted(); }
     check.durationMs=Math.max(0,performance.now()-started);return {check,denial};
