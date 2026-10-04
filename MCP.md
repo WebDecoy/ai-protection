@@ -345,8 +345,8 @@ property. A reason is required. Pauses can expire or remain until resumed.
 Concurrent stale edits are rejected and each successful change is audited.
 
 The check runs after application permissions and before shared limits or execution,
-for each admitted tool call. It adds one network request with a 250 ms deadline,
-no retries and no decision cache. A saved pause applies to subsequent successful
+for each admitted tool call. It adds one network request with a 1000 ms default deadline (`callerPauseTimeoutMs`, range 1–10000 ms),
+no retries and no decision cache. Very short deadlines can fail open during cold API-key authentication. A saved pause applies to subsequent successful
 checks; a call already admitted or running is not cancelled. Resuming needs no cache
 invalidation. A restart reads current state on the next check.
 
