@@ -320,3 +320,18 @@ rates, generate seeded names, record initialization events, remotely deliver dec
 configuration, or provide a labeled test-trigger flow. Configuration requires an
 application deployment. Those remain separate roadmap work. No low-false-positive
 or caller-containment guarantee is made.
+
+### Caller-attributed enumeration (alpha.13)
+
+With `discovery` and `sharedRuntime.reportCaller: true`, authenticated `tools/list`
+reports carry the same property-scoped pseudonym as tool calls. Raw identities,
+credentials and scopes are not uploaded. Attribution stays off by default.
+The hosted receiver must support caller-attributed catalogs before enabling this
+SDK version; older receivers reject the new optional field without interrupting
+tool listing. Listings with no visible tools also generate an empty catalog.
+
+Caller timelines show enumeration separately from calls and decoy trips. Listing
+is normal client behavior, not an enforcement decision. Large listings are split
+into batches of up to 64 tools; each batch is a report, not a distinct listing
+count. Unattributed older catalogs are never assigned to a caller retrospectively.
+Initialization and automatic containment remain outside this feature.

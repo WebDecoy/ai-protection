@@ -189,3 +189,18 @@ test('reporting outage cannot turn a decoy into executable work',async t=>{
  await awaitReports(sink,1);assert.equal(sink.reports[0].handler_attempted,false);
  await result(await f.post(call('records.read')));assert.equal(f.counts().reads,1);await awaitReports(sink,3);
 });
+
+test('opt-in enumeration attribution matches action pseudonyms and reports empty listings',async t=>{
+ const sink=await reportingFixture(t);const sharedRuntime={...sink.sharedRuntime,reportCaller:true};
+ const f=await fixture(t,{sharedRuntime,discovery:{serverId:'records'}});
+ await result(await f.post({jsonrpc:'2.0',id:1,method:'tools/list',params:{}}));await f.flush();
+ await result(await f.post(call('records.read',{id:'a'})));await awaitReports(sink,3);
+ const catalog=sink.reports.find(r=>r.tool_catalog).tool_catalog;
+ const action=sink.reports.find(r=>r.tool_action).tool_action;
+ assert.deepEqual(catalog.caller,action.caller);assert.match(catalog.caller.id,/^[a-f0-9]{64}$/);
+ for(const secret of ['reader','org_a','test-key'])assert.equal(JSON.stringify(catalog).includes(secret),false);
+ const empty=await fixture(t,{sharedRuntime,discovery:{serverId:'empty'},registry:{hidden:{description:'Hidden',inputSchema:{type:'object'},requiredScopes:['hidden'],validate:()=>true,authorize:()=>false,execute:()=>({content:[]})}}});
+ await result(await empty.post({jsonrpc:'2.0',id:1,method:'tools/list',params:{}}));await empty.flush();
+ const listing=sink.reports.find(r=>r.tool_catalog?.server_id==='empty').tool_catalog;
+ assert.deepEqual(listing.tools,[]);assert.ok(listing.caller);
+});
