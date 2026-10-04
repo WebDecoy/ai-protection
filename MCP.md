@@ -321,7 +321,7 @@ configuration, or provide a labeled test-trigger flow. Configuration requires an
 application deployment. Those remain separate roadmap work. No low-false-positive
 or caller-containment guarantee is made.
 
-### Caller-attributed enumeration (Alpha)
+### Caller-attributed enumeration (alpha.13)
 
 With `discovery` and `sharedRuntime.reportCaller: true`, authenticated `tools/list`
 reports carry the same property-scoped pseudonym as tool calls. Raw identities,
