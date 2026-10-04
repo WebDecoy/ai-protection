@@ -57,10 +57,17 @@ starting execution. `fetcher` is a trusted test/transport injection, never reque
 configuration. Return generic authentication errors; do not expose verification
 exceptions or tokens in responses/logs.
 
-HTTP/MCP transports must map authentication errors to their proper challenges and
-permission denials to protocol errors. This example is not yet an MCP server and
-does not implement its discovery/challenge flow. A live customer-owned Auth0
-integration remains a pilot verification step.
+The [MCP example](../mcp/README.md) uses this verifier with the public MCP handler,
+protected-resource discovery, HTTP challenges and per-tool scope checks. Its
+real-client tests currently use locally signed tokens and a fixture JWKS transport;
+a live customer-owned Auth0 token/JWKS validation remains a separate verification step.
+
+The supported profile has no delegation chain. Tokens containing `act` or `may_act`
+are rejected before tenant lookup; accepting delegation requires a separately
+implemented and reviewed actor/subject authorization contract. Arbitrary `agent_id`
+claims and agent headers never establish a verified signer. Subject, client,
+organization and scopes are bounded before reaching application membership code.
+See the [caller identity contract](../../CALLER_IDENTITY.md).
 
 References:
 - [Auth0 access-token validation](https://auth0.com/docs/secure/tokens/access-tokens/validate-access-tokens)

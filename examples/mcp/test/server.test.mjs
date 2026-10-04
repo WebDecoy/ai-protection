@@ -204,3 +204,24 @@ test('opt-in enumeration attribution matches action pseudonyms and reports empty
  const listing=sink.reports.find(r=>r.tool_catalog?.server_id==='empty').tool_catalog;
  assert.deepEqual(listing.tools,[]);assert.ok(listing.caller);
 });
+
+test('shared address and unavailable runtime do not merge caller authority',async t=>{
+ const sink=await reportingFixture(t,503);
+ const f=await fixture(t,{sharedRuntime:{...sink.sharedRuntime,reportCaller:true,callerPause:true,callerPauseTimeoutMs:100}});
+ const a=await f.token(),b=await f.token({sub:'second-reader',org_id:'org_b'});
+ for(const [bearer,id] of [[a,'a'],[b,'b']]){
+   const reply=await result(await f.post(call('records.read',{id}),{bearer}));
+   assert.equal(reply.result.content[0].text,'owned record');
+ }
+ const crossing=await result(await f.post(call('records.read',{id:'a'}),{bearer:b}));
+ assert.equal(crossing.result.isError,true);
+ for(const claims of [{exp:1},{iss:'https://wrong.example/'},{aud:'wrong'},{act:{sub:'delegate'}}]){
+   assert.equal((await f.post(call('records.read'),{bearer:await f.token(claims)})).status,401);
+ }
+ assert.equal((await f.post(call('records.export',{}),{bearer:a})).status,403);
+ assert.equal(f.counts().reads,2);assert.equal(f.counts().exports,0);
+ const completed=f.events.filter(e=>e.outcome==='completed');
+ assert.equal(new Set(completed.map(e=>e.caller.id)).size,2);
+ assert.ok(completed.every(e=>e.checks.some(c=>c.id==='caller_pause'&&c.decision==='unavailable')));
+ await f.flush();
+});
