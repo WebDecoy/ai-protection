@@ -24,7 +24,7 @@ test('tool pause blocks only the named server/tool and records the revision with
 });
 test('tool and caller controls share one request and preserve both check results',async t=>{
  const f=await fixture(t,true),guard=f.make();await assert.rejects(guard.run('write',{},null),e=>e.reason==='tool_paused');await guard.flush();assert.equal(f.requests.length,1);assert.match(f.requests[0].caller,/^[a-f0-9]{64}$/);assert.deepEqual(f.reports[0].checks.slice(1).map(c=>c.id),['caller_pause','tool_pause']);
- f.blockCaller();await assert.rejects(guard.run('read',{},null),e=>e.reason==='caller_paused');assert.equal(f.calls(),0);
+ f.blockCaller();await assert.rejects(guard.run('write',{},null),e=>e.reason==='caller_paused');assert.equal(f.calls(),0);await guard.flush();assert.deepEqual(f.reports.at(-1).checks.slice(1).map(c=>c.decision),['deny','deny']);
 });
 test('tool controls fail open on unavailable, timed-out and malformed responses',async t=>{
  const f=await fixture(t),guard=f.make();f.break();await guard.run('write',{},null);f.slow();await guard.run('write',{},null);await guard.flush();assert.equal(f.calls(),2);assert.ok(f.reports.every(r=>r.degraded));
