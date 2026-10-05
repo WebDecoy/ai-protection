@@ -48,3 +48,31 @@ No secrets or source contents are printed. Follow the remediation fields, compil
 and run an owned synthetic workload before claiming protection. The app repository's
 MCP/PostgreSQL acceptance and this example's official-client tests demonstrate
 supported behavior in fixtures; they do not validate your deployment automatically.
+
+## Read-only property/runtime diagnostic
+
+From the source checkout, provide `WEBDECOY_KEY` and `WEBDECOY_PROPERTY_ID` through
+your server environment or secret manager, then run:
+
+```sh
+node scripts/diagnose-mcp.mjs
+```
+
+`WEBDECOY_URL` optionally overrides the default
+`https://ai-protection.webdecoy.com` origin. HTTPS is required except on loopback.
+Do not pass a key as a command-line argument. The command sends one authenticated
+GET to `/api/v1/sdk/ai-abuse/config`, with a two-second deadline, no redirect
+following, no retry and a 16 KiB response limit. It never calls tools, sends model
+requests, reserves quota, submits reports or changes configuration.
+
+Exit 0 means only that the schema-1 config endpoint accepted the credentials and
+returned the selected property. Exit 1 includes a bounded diagnostic reason and
+remediation. Keys, response bodies and other properties' identifiers are never
+printed. The chosen runtime origin receives the key, so use your trusted gateway.
+
+`configuredPropertyMode` is the server's property configuration, and
+`cloudEnforcementEntitled` is an entitlement. Neither establishes effective
+per-tool mode or failure policy: those also depend on the local application
+options. `effectiveToolControls` and route `coverage` remain `not_verified`.
+Credential success does not establish caller authentication, permission checks,
+model/request correlation, budget settlement or evidence delivery.
