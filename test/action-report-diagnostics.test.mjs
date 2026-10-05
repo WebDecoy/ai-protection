@@ -3,11 +3,16 @@ import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {createActionProtection} from '../actions.mjs';
 import {collectMCPDiagnostics} from '../scripts/inspect-mcp-controls.mjs';
-async function fixture(t,{status=202,observer,stall=false}={}){
- const reports=[];const server=createServer(async(req,res)=>{let raw='';for await(const chunk of req)raw+=chunk;reports.push(JSON.parse(raw));if(stall)return;res.writeHead(status);res.end('private-response');});
+async function fixture(t,{status=202,observer,stall=false,quota}={}){
+ const reports=[];const server=createServer(async(req,res)=>{let raw='';for await(const chunk of req)raw+=chunk;
+ if(req.url.endsWith('/quota')){
+  if(quota.response==='outage'){res.writeHead(503);res.end();return;}
+  res.setHeader('content-type','application/json');res.end(JSON.stringify({schema:1,allowed:false,reason:'account_quota_exceeded',remaining:0,reset_at:2000000000,retry_after_seconds:60}));return;
+ }
+ reports.push(JSON.parse(raw));if(stall)return;res.writeHead(status);res.end('private-response');});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>{server.closeAllConnections();return new Promise(r=>server.close(r));});
  const diagnostics=collectMCPDiagnostics();let calls=0;
- const guard=createActionProtection({policyVersion:'v1',onEvent:diagnostics.onEvent,sharedRuntime:{webdecoyUrl:`http://127.0.0.1:${server.address().port}`,propertyId:'11111111-1111-4111-8111-111111111111',webdecoyKey:'private-key',subjectSecret:'x'.repeat(32),reportingTimeoutMs:stall?50:1000,onReport:observer??diagnostics.onReport},authenticate:()=>({schema:1,subject:'private-subject',tenant:'private-tenant',issuer:'fixture',authenticationMethod:'session',expiresAt:Date.now()+60000,scopes:[]}),actions:{read:{requiredScopes:[],validate:()=>true,authorize:()=>true,execute:()=>{calls++;return 'private-result';}}}});
+ const guard=createActionProtection({policyVersion:'v1',onEvent:diagnostics.onEvent,sharedRuntime:{webdecoyUrl:`http://127.0.0.1:${server.address().port}`,propertyId:'11111111-1111-4111-8111-111111111111',webdecoyKey:'private-key',subjectSecret:'x'.repeat(32),reportingTimeoutMs:stall?50:1000,onReport:observer??diagnostics.onReport},authenticate:()=>({schema:1,subject:'private-subject',tenant:'private-tenant',issuer:'fixture',authenticationMethod:'session',expiresAt:Date.now()+60000,scopes:[]}),actions:{read:{...(quota?{limits:{callerQuota:{ruleId:'diagnostic',limit:1,windowSeconds:60,mode:quota.mode,failureMode:quota.failureMode}}}:{}),requiredScopes:[],validate:()=>true,authorize:()=>true,execute:()=>{calls++;return 'private-result';}}}});
  return {guard,diagnostics,reports,calls:()=>calls};
 }
 test('HTTP receipts correlate attempts/completion without claiming retained evidence',async t=>{
@@ -23,4 +28,14 @@ test('missing/mismatched receipts and bounded collection remain unknown',()=>{
  const d=collectMCPDiagnostics(),actionId='11111111-1111-4111-8111-111111111111';
  const eventId='22222222-2222-4222-8222-222222222222';d.onEvent({eventId,actionId,outcome:'completed',checks:[]});d.onReport({eventId,actionId:'33333333-3333-4333-8333-333333333333',status:'accepted'});assert.equal(d.snapshot().reporting.missingOrPending,1);
  for(let i=0;i<1100;i++)d.onEvent({eventId:`${i.toString(16).padStart(8,'0')}-0000-4000-8000-000000000000`,actionId,outcome:'attempted',checks:[]});assert.ok(d.snapshot().dropped>0);assert.equal(d.snapshot().phases.completed+d.snapshot().phases.attempted,1000);
+});
+
+for(const response of ['exceeded','outage'])for(const mode of ['observe','enforce'])for(const failureMode of ['open','closed'])test(`observed ${response}/${mode}/${failureMode} diagnoses actual dispatch and reporting`,async t=>{
+ const f=await fixture(t,{quota:{response,mode,failureMode}});
+ const denies=mode==='enforce'&&(response==='exceeded'||failureMode==='closed');
+ if(denies)await assert.rejects(f.guard.run('read',{},null));else assert.equal(await f.guard.run('read',{},null),'private-result');
+ await f.guard.flush();await new Promise(r=>setImmediate(r));
+ const r=f.diagnostics.snapshot();assert.equal(f.calls(),denies?0:1);
+ assert.equal(r.controls.length,1);assert.equal(r.controls[0].kind,'caller_quota');assert.equal(r.controls[0].mode,mode);assert.equal(r.controls[0].decision,response==='outage'?'unavailable':'deny');
+ assert.equal(r.reporting.accepted,denies?1:2);assert.equal(r.phases.not_attempted,denies?1:0);assert.equal(r.phases.completed,denies?0:1);
 });
