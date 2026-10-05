@@ -148,3 +148,19 @@ Success requires one allowed callback and zero forbidden callbacks. CI exercises
 the same runner with generated keys and fixture JWKS. CI success **does not** mean
 a live Auth0 tenant has been verified. Record a live run separately with its
 commit, time, sanitized summary and privately maintained fixture configuration.
+
+
+### Machine-to-machine verification
+
+For a dedicated Auth0 test application using client credentials, set
+`AUTH0_MACHINE_CLIENT_ID` to the client ID from your Auth0 dashboard instead of
+`AUTH0_SUBJECT`/`AUTH0_ORGANIZATION` (leave those two unset). Use a token with only
+`records:read` for this test API. The runner requires a verified subject equal to
+`<configured-client-id>@clients`, matching OAuth `azp`, and no organization claim.
+It maps that explicit application allowlist to a synthetic tenant. The configured
+client ID must come from your trusted dashboard, never be accepted automatically
+from decoded token contents. Mixed user/machine configuration is rejected.
+
+This proves a machine-principal integration; it does not validate user login,
+Auth0 Organizations membership, delegated-user consent or token exchange.
+The tenant mapping belongs to your application and need not use Auth0 Organizations.

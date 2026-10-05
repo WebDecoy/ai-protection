@@ -32,3 +32,13 @@ test('CLI errors never print token file contents',async()=>{
   assert.ok(!(result.stdout+result.stderr).includes(secret));
  } finally {await rm(dir,{recursive:true,force:true});}
 });
+
+async function machineConfig(claims={}) {
+ const c=await config({sub:'owned-machine@clients',azp:'owned-machine',org_id:undefined,...claims});
+ delete c.subject;delete c.organization;c.machineClientId='owned-machine';return c;
+}
+test('machine credential is mapped through explicit application allowlist',async()=>{
+ const result=await verifyAuth0(await machineConfig());assert.equal(result.allowed_callbacks,1);assert.equal(result.forbidden_callbacks,0);
+});
+for(const [name,claims] of [['other subject',{sub:'other@clients'}],['other client',{azp:'other'}],['missing client',{azp:undefined}],['unexpected organization',{org_id:'other-org'}]])test('machine mapping rejects '+name,async()=>{await assert.rejects(verifyAuth0(await machineConfig(claims)));});
+test('machine and user configuration cannot be mixed',async()=>{await assert.rejects(verifyAuth0({...await machineConfig(),subject:'user',organization:'org'}));});
