@@ -50,7 +50,11 @@ export function createProtectedMCPHandler(options) {
     if (options.discovery) for (const [name, tool] of Object.entries(tools))
         tool.toolSchema = Object.freeze({serverId:options.discovery.serverId,hash:hashes[name],...(decoys.has(name)?{decoy:decoys.get(name)}:{effect:inferToolEffect(name,tool.inputSchema,tool.annotations),permissions:Object.freeze({schema:1,required_scopes:tool.requiredScopes.length,application_authorization:true,additional_policy:typeof tool.policy==='function'})})});
     // Validate after discovery supplies the schema required by tool pauses.
-    createActionProtection({ policyVersion: options.policyVersion, authenticate: options.authenticate, actions: tools, sharedRuntime: options.sharedRuntime });
+    if (typeof options.authenticate !== 'function') throw Error('Invalid MCP authenticator');
+    // One bounded reporting runtime per handler. The caller is passed per run,
+    // never held in mutable shared request state. HTTP authentication stays above
+    // dispatch; the action boundary independently validates and snapshots it.
+    const guard = createActionProtection({ policyVersion: options.policyVersion, authenticate: caller => caller, actions: tools, sharedRuntime: options.sharedRuntime, onEvent: options.onEvent });
     const runtime = options.sharedRuntime && { ...options.sharedRuntime };
     const serverId = options.discovery?.serverId;
     const catalogReporter = options.discovery ? createReporter({
@@ -177,7 +181,6 @@ export function createProtectedMCPHandler(options) {
                 res.end();
                 return;
             }
-            const guard = createActionProtection({ policyVersion: options.policyVersion, authenticate: () => caller, actions: tools, sharedRuntime: options.sharedRuntime, onEvent: options.onEvent });
             // Scope escalation belongs at HTTP level, before the SDK opens an SSE stream.
             if (message.method === 'tools/call' && typeof message.params?.name === 'string') {
                 const definition = Object.hasOwn(tools, message.params.name) ? tools[message.params.name] : undefined;
@@ -185,7 +188,7 @@ export function createProtectedMCPHandler(options) {
                     // Run the same admission path for its sanitized denial evidence. It cannot
                     // dispatch with a missing required scope, regardless of discovery results.
                     try {
-                        await guard.run(message.params.name, {}, null, { signal: disconnected.signal });
+                        await guard.run(message.params.name, {}, caller, { signal: disconnected.signal });
                     }
                     catch (e) {
                         if (!(e instanceof ActionDenied))
@@ -225,7 +228,7 @@ export function createProtectedMCPHandler(options) {
                 running.started = true;
                 const signal = AbortSignal.any([extra.signal, disconnected.signal, running.controller.signal]);
                 try {
-                    return await guard.run(request.params.name, (request.params.arguments ?? {}), null, { signal });
+                    return await guard.run(request.params.name, (request.params.arguments ?? {}), caller, { signal });
                 }
                 catch (e) {
                     if (signal.aborted)
@@ -237,7 +240,6 @@ export function createProtectedMCPHandler(options) {
                 }
                 finally {
                     cleanup();
-                    void guard.flush();
                 }
             });
             await server.connect(transport);
@@ -250,5 +252,5 @@ export function createProtectedMCPHandler(options) {
                 res.destroy();
         }
     };
-    return Object.assign(handle, { flush: async () => { await catalogReporter?.flush(); } });
+    return Object.assign(handle, { flush: async () => { await Promise.all([catalogReporter?.flush(), guard.flush()]); } });
 }

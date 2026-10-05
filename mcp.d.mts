@@ -44,6 +44,6 @@ export interface ProtectedMCPOptions {
  */
 export function createProtectedMCPHandler(options: ProtectedMCPOptions):
   ((request: IncomingMessage, response: ServerResponse) => Promise<void>) & {
-    /** Drain pending discovery reports at shutdown. Does not wait for running tools. */
+    /** Drain already queued discovery/action reports within reporting deadlines. Does not wait for running tools, future reports or observer callbacks. */
     flush(): Promise<void>;
   };

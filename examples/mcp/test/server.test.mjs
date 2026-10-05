@@ -318,3 +318,46 @@ test('MCP tool pauses receive generated schema metadata before startup validatio
  assert.equal(response.isError,true);assert.equal(response._meta['webdecoy.com/action-error'].reason,'tool_paused');assert.equal(f.counts().reads,0);
  assert.equal(checked.length,1);assert.equal(checked[0].server_id,'pause-fixture');assert.equal(checked[0].tool,'records.read');
 });
+
+async function heldReportingFixture(t,{status=202,timeoutMs=1000,maxPendingReports=100,observer}={}){
+ const reports=[],receipts=[];let release;const held=new Promise(r=>release=r);
+ const http=createServer(async(req,res)=>{let raw='';for await(const chunk of req)raw+=chunk;reports.push(JSON.parse(raw));await held;if(!res.destroyed){res.writeHead(status);res.end();}});
+ await new Promise(r=>http.listen(0,'127.0.0.1',r));t.after(()=>{release();http.closeAllConnections();return new Promise(r=>http.close(r));});
+ return {reports,receipts,release,sharedRuntime:{webdecoyUrl:`http://127.0.0.1:${http.address().port}`,webdecoyKey:'test-key',propertyId:'11111111-1111-4111-8111-111111111111',subjectSecret:'a'.repeat(32),reportingTimeoutMs:timeoutMs,maxPendingReports,onReport:r=>{receipts.push(r);return observer?.(r);}}};
+}
+async function officialClient(t,f,claims={}){
+ const c=new Client({name:'flush-fixture',version:'1'});await c.connect(new StreamableHTTPClientTransport(new URL(f.resource),{requestInit:{headers:{Authorization:'Bearer '+await f.token(claims)}}}));t.after(()=>c.close());return c;
+}
+test('MCP flush drains concurrent completed and HTTP scope-denied action reports',{timeout:5000},async t=>{
+ const sink=await heldReportingFixture(t,{timeoutMs:2000});const f=await fixture(t,{sharedRuntime:sink.sharedRuntime});
+ const a=await officialClient(t,f),b=await officialClient(t,f,{sub:'other',org_id:'org_b'});
+ await Promise.all([a.callTool({name:'records.read',arguments:{id:'a'}}),b.callTool({name:'records.read',arguments:{id:'b'}})]);
+ assert.equal((await f.post(call('records.export',{}))).status,403);assert.deepEqual(f.counts(),{reads:2,exports:0,cancelled:0});
+ await awaitReports(sink,5);let flushed=false;const pending=f.flush().then(()=>{flushed=true;});
+ await new Promise(r=>setTimeout(r,30));assert.equal(flushed,false,'flush returned before held action reports');assert.equal(sink.receipts.length,0);
+ sink.release();await pending;assert.equal(sink.receipts.length,5);assert.ok(sink.receipts.every(r=>r.status==='accepted'));
+ assert.equal(new Set(sink.reports.map(r=>r.tool_action.action_id)).size,3);assert.equal(sink.reports.filter(r=>r.tool_action.outcome==='not_attempted').length,1);
+});
+test('MCP flush handles reporting rejection and hung observers without retrying work',{timeout:5000},async t=>{
+ for(const status of [202,503]){
+  const sink=await heldReportingFixture(t,{status,observer:()=>new Promise(()=>{})});const f=await fixture(t,{sharedRuntime:sink.sharedRuntime});const client=await officialClient(t,f);
+  const r=await client.callTool({name:'records.read',arguments:{id:'a'}});assert.equal(r.content[0].text,'owned record');await awaitReports(sink,2);
+  sink.release();await f.flush();assert.equal(sink.receipts.length,2);assert.ok(sink.receipts.every(r=>r.status===(status===202?'accepted':'unavailable')));assert.equal(f.counts().reads,1);
+ }
+});
+test('MCP flush honors reporting timeout and a shared bounded queue',{timeout:5000},async t=>{
+ const sink=await heldReportingFixture(t,{timeoutMs:1000,maxPendingReports:2});const f=await fixture(t,{sharedRuntime:sink.sharedRuntime});const client=await officialClient(t,f);
+ for(let i=0;i<3;i++)assert.equal((await client.callTool({name:'records.read',arguments:{id:'a'}})).content[0].text,'owned record');
+ await awaitReports(sink,2);await Promise.race([f.flush(),new Promise((_,reject)=>{const timer=setTimeout(()=>reject(Error('flush exceeded reporting deadline')),2000);timer.unref();})]);
+ assert.equal(f.counts().reads,3);assert.equal(sink.reports.length,2);assert.ok(sink.receipts.every(r=>r.status==='unavailable'));
+ // Remaining events were dropped at the bounded queue; flush does not create retries.
+ sink.release();await f.flush();assert.equal(sink.reports.length,2);
+});
+test('MCP flush does not await running tools; cancellation reports drain afterwards',{timeout:5000},async t=>{
+ const sink=await heldReportingFixture(t);const f=await fixture(t,{blocked:true,sharedRuntime:sink.sharedRuntime});const client=await officialClient(t,f);
+ const controller=new AbortController();const call=client.callTool({name:'records.read',arguments:{id:'a'}},undefined,{signal:controller.signal}).catch(()=>{});await f.started;
+ await awaitReports(sink,1);sink.release();await f.flush();assert.equal(f.counts().cancelled,0);assert.equal(sink.receipts.length,1);
+ controller.abort();await call;
+ for(let i=0;i<200&&!f.counts().cancelled;i++)await new Promise(r=>setTimeout(r,10));assert.equal(f.counts().cancelled,1);
+ await f.flush();assert.equal(sink.receipts.length,2);assert.equal(sink.reports.at(-1).tool_action.outcome,'unknown');assert.equal(f.counts().reads,1);
+});

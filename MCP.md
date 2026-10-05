@@ -11,7 +11,7 @@ resource authorization.
 Available in `0.1.0-alpha.5` and later compatible alpha releases:
 
 ```sh
-npm install @webdecoy/ai-protection@0.1.0-alpha.17 @modelcontextprotocol/sdk@1.31.0
+npm install @webdecoy/ai-protection@0.1.0-alpha.18 @modelcontextprotocol/sdk@1.31.0
 ```
 
 Requires Node 22.22.3+ and MCP SDK **1.31.0**. The MCP SDK is an optional peer, so
@@ -161,9 +161,17 @@ Discovery uses schema-3 reports on the existing reporting endpoint; deploy a
 compatible hosted runtime first. Old runtimes reject these optional reports
 without affecting tool listing. Reporting has bounded pending work and a deadline,
 never blocks authorization, and does not retry. Call `await handler.flush()` at a
-host shutdown/lifecycle boundary to drain pending discovery reports; it does not
-wait for active tool calls or action reports. Abruptly terminated hosts can lose
-reports. Discovery advertisements never increment tool action or request counts.
+host shutdown/lifecycle boundary to drain discovery and tool-action reports already
+queued when flush begins. From alpha.18, the action reporting queue is shared by
+all calls on one handler and is bounded by `sharedRuntime.maxPendingReports`
+(default 100); discovery uses a separately bounded queue. Full queues drop reports
+without retrying or blocking tool execution.
+
+Stop accepting new requests and let active tools complete or cancel before the
+final flush. Flush does not wait for running tools, future reports, arbitrary
+`onEvent`/`onReport` callbacks or dashboard persistence. Reporting deadlines still
+apply; an unavailable/timeout/drop is not delivery success. Abruptly terminated
+hosts can lose reports. Discovery advertisements never increment tool action or request counts.
 
 
 ### Calls before discovery (alpha.8+)
