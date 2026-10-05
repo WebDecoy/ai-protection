@@ -92,7 +92,16 @@ Permission errors never become allowed because cloud detection is unavailable.
 The example re-exports `@webdecoy/ai-protection/mcp`; there is no separate copy of
 the transport wrapper. Optional `sharedRuntime` enables caller/tenant quotas, concurrency and hosted
 action events through the underlying [action configuration](../actions/README.md#shared-limits-and-hosted-evidence).
-Weighted work reservations and session/resumption support remain follow-ups.
+Weighted work reservations are available; see [WORK.md](../../WORK.md).
+Session/resumption support remains outside this stateless adapter.
+
+The official-client tests cover fresh connections across two handler instances,
+shared caller allowance exhaustion, independent caller/tenant allowance, explicit
+state-service open/closed outages and recovery, SSE request-ID correlation, and
+caller/tenant/client-bound cancellation. The state-service fixture in these tests
+is deterministic HTTP, not PostgreSQL: runtime atomicity and the complete
+customer-workload acceptance are separate validation layers. No model calls are
+made by these tests.
 Installing npm `0.1.0-alpha.4` provides both the action API and MCP entrypoint.
 Integrating either API requires application code; dashboard enforcement does not
 install it.

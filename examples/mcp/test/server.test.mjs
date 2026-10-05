@@ -8,13 +8,13 @@ import {generateKeyPair,exportJWK,SignJWT} from 'jose';
 import {createAuth0Authenticator} from '../../auth0/authenticate.mjs';
 const keys=await generateKeyPair('RS256');const jwk={...await exportJWK(keys.publicKey),kid:'fixture',alg:'RS256',use:'sig'};
 const issuer='https://fixture.auth0.com/';
-async function fixture(t,{blocked=false,sharedRuntime,discovery,inputSchema,annotations,registry,decoys}={}){
+async function fixture(t,{blocked=false,sharedRuntime,discovery,inputSchema,annotations,registry,decoys,limits}={}){
  let handler;const http=createServer((req,res)=>{void handler(req,res);});
  await new Promise(r=>http.listen(0,'127.0.0.1',r));const resource=`http://127.0.0.1:${http.address().port}/mcp`;
  let reads=0,exports=0,cancelled=0;const events=[];let started;const startedPromise=new Promise(r=>started=r);
  const authenticate=createAuth0Authenticator({issuer,audience:resource,fetcher:async()=>Response.json({keys:[jwk]}),resolveTenant:({organizationId})=>organizationId==='org_a'?'a':organizationId==='org_b'?'b':null});
  handler=createProtectedMCPHandler({sharedRuntime,discovery,decoys,resource,authorizationServer:issuer,authenticate,policyVersion:'records_v1',onEvent:e=>events.push(e),tools:registry??{
-  'records.read':{annotations,description:'Read an owned record',inputSchema:inputSchema??{type:'object',properties:{id:{type:'string'}},required:['id'],additionalProperties:false},requiredScopes:['records:read'],validate:args=>Object.keys(args).length===1&&typeof args.id==='string',authorize:({caller,args})=>caller.tenant===args.id,execute:async({signal})=>{reads++;started();if(blocked)await new Promise((_,reject)=>{if(signal.aborted){cancelled++;reject(signal.reason);}else signal.addEventListener('abort',()=>{cancelled++;reject(signal.reason);},{once:true});});return {content:[{type:'text',text:'owned record'}]};}},
+  'records.read':{limits,annotations,description:'Read an owned record',inputSchema:inputSchema??{type:'object',properties:{id:{type:'string'}},required:['id'],additionalProperties:false},requiredScopes:['records:read'],validate:args=>Object.keys(args).length===1&&typeof args.id==='string',authorize:({caller,args})=>caller.tenant===args.id,execute:async({signal})=>{reads++;started();if(blocked)await new Promise((_,reject)=>{if(signal.aborted){cancelled++;reject(signal.reason);}else signal.addEventListener('abort',()=>{cancelled++;reject(signal.reason);},{once:true});});return {content:[{type:'text',text:'owned record'}]};}},
   'records.export':{description:'Export records',inputSchema:{type:'object'},requiredScopes:['records:export'],validate:()=>true,authorize:()=>false,execute:()=>{exports++;return {content:[]};}},
  }});
  t.after(()=>{http.closeAllConnections();return new Promise(r=>http.close(r));});
@@ -41,7 +41,9 @@ test('disconnect cancels running tool and never retries',async t=>{const f=await
 test('MCP cancellation is bound to authenticated caller, tenant and client',async t=>{
  const f=await fixture(t,{blocked:true});const pending=f.post(call('records.read')).then(r=>r.text());await f.started;
  const notification={jsonrpc:'2.0',method:'notifications/cancelled',params:{requestId:2}};
- const foreign=await f.post(notification,{bearer:await f.token({org_id:'org_b'})});assert.equal(foreign.status,202);assert.equal(f.counts().cancelled,0);
+ for(const claims of [{org_id:'org_b'},{sub:'other-reader'},{azp:'other-client'}]){
+  const foreign=await f.post(notification,{bearer:await f.token(claims)});assert.equal(foreign.status,202);assert.equal(f.counts().cancelled,0);
+ }
  const own=await f.post(notification);assert.equal(own.status,202);await pending;
  assert.deepEqual(f.counts(),{reads:1,exports:0,cancelled:1});
 });
@@ -224,4 +226,79 @@ test('shared address and unavailable runtime do not merge caller authority',asyn
  assert.equal(new Set(completed.map(e=>e.caller.id)).size,2);
  assert.ok(completed.every(e=>e.checks.some(c=>c.id==='caller_pause'&&c.decision==='unavailable')));
  await f.flush();
+});
+
+// Deterministic HTTP state-service contract fixture. Atomic PostgreSQL behavior
+// is covered by the runtime suite; this proves MCP client/transport integration.
+async function quotaFixture(t) {
+ const counts=new Map();let unavailable=false, requests=0;
+ const http=createServer(async(req,res)=>{
+  let raw='';for await(const chunk of req)raw+=chunk;
+  if(req.url.endsWith('/reports')){res.writeHead(202);res.end();return;}
+  assert.ok(req.url.endsWith('/quota'));
+  requests++;
+  if(unavailable){res.writeHead(503);res.end();return;}
+  const body=JSON.parse(raw),key=body.rule_id+':'+body.subject;
+  const count=counts.get(key)??0,allowed=count<body.limit;
+  if(allowed)counts.set(key,count+1);
+  res.setHeader('content-type','application/json');
+  res.end(JSON.stringify({schema:1,allowed,reason:allowed?'account_quota_allowed':'account_quota_exceeded',remaining:Math.max(0,body.limit-(counts.get(key)??0)),retry_after_seconds:allowed?0:30,reset_at:Math.floor(Date.now()/1000)+30}));
+ });
+ await new Promise(r=>http.listen(0,'127.0.0.1',r));
+ t.after(()=>{http.closeAllConnections();return new Promise(r=>http.close(r));});
+ return {sharedRuntime:{webdecoyUrl:`http://127.0.0.1:${http.address().port}`,webdecoyKey:'fixture',propertyId:'11111111-1111-4111-8111-111111111111',subjectSecret:'x'.repeat(32)},setUnavailable:value=>{unavailable=value;},requests:()=>requests};
+}
+const callerLimit=failureMode=>({callerQuota:{ruleId:'mcp_read_v1',limit:1,windowSeconds:60,mode:'enforce',failureMode}});
+async function connectClient(t,f,claims={}) {
+ const client=new Client({name:'lifecycle-fixture',version:'1'});
+ await client.connect(new StreamableHTTPClientTransport(new URL(f.resource),{requestInit:{headers:{Authorization:'Bearer '+await f.token(claims)}}}));
+ t.after(()=>client.close());return client;
+}
+test('fresh official MCP clients and replicas cannot reset shared caller allowance',async t=>{
+ const state=await quotaFixture(t);
+ const a=await fixture(t,{sharedRuntime:state.sharedRuntime,limits:callerLimit('closed')});
+ const b=await fixture(t,{sharedRuntime:state.sharedRuntime,limits:callerLimit('closed')});
+ const first=await connectClient(t,a);
+ assert.equal((await first.callTool({name:'records.read',arguments:{id:'a'}})).content[0].text,'owned record');
+ await first.close();
+ for(const server of [a,b]){
+  const fresh=await connectClient(t,server);
+  const denied=await fresh.callTool({name:'records.read',arguments:{id:'a'}});
+  assert.equal(denied.isError,true);
+  assert.deepEqual(denied._meta['webdecoy.com/action-error'],{reason:'account_quota_exceeded',status:429,retryAfterSeconds:30});
+ }
+ const other=await connectClient(t,b,{sub:'other-reader'});
+ assert.equal((await other.callTool({name:'records.read',arguments:{id:'a'}})).content[0].text,'owned record');
+ const tenant=await connectClient(t,b,{org_id:'org_b'});
+ assert.equal((await tenant.callTool({name:'records.read',arguments:{id:'b'}})).content[0].text,'owned record');
+ assert.equal(a.counts().reads,1);assert.equal(b.counts().reads,2);assert.equal(state.requests(),5);
+});
+for(const mode of ['open','closed'])test(`MCP state outage ${mode} preserves permissions and recovers without transport reset`,async t=>{
+ const state=await quotaFixture(t);state.setUnavailable(true);
+ const f=await fixture(t,{sharedRuntime:state.sharedRuntime,limits:callerLimit(mode)});
+ const client=await connectClient(t,f);
+ const crossed=await client.callTool({name:'records.read',arguments:{id:'b'}});
+ assert.equal(crossed.isError,true);assert.equal(crossed._meta['webdecoy.com/action-error'].reason,'permission_denied');
+ assert.equal(state.requests(),0);assert.equal(f.counts().reads,0);
+ const reply=await client.callTool({name:'records.read',arguments:{id:'a'}});
+ if(mode==='closed'){assert.equal(reply.isError,true);assert.equal(reply._meta['webdecoy.com/action-error'].status,503);}
+ else assert.equal(reply.content[0].text,'owned record');
+ assert.equal(f.counts().reads,mode==='closed'?0:1);
+ state.setUnavailable(false);
+ assert.equal((await client.callTool({name:'records.read',arguments:{id:'a'}})).content[0].text,'owned record');
+ const denied=await client.callTool({name:'records.read',arguments:{id:'a'}});
+ assert.equal(denied._meta['webdecoy.com/action-error'].status,429);
+ assert.equal(f.counts().reads,mode==='closed'?1:2);
+});
+
+test('stateless SSE responses correlate string and numeric IDs without session or resume authority',async t=>{
+ const f=await fixture(t);
+ for(const id of ['request-a',17]){
+  const response=await f.post({...call('records.read'),id});
+  assert.match(response.headers.get('content-type'),/text\/event-stream/);
+  assert.equal(response.headers.get('mcp-session-id'),null);
+  const reply=await result(response);assert.equal(reply.id,id);assert.equal(reply.result.content[0].text,'owned record');
+ }
+ assert.equal((await f.post(call('records.read'),{headers:{'Last-Event-ID':'invented-resume'}})).status,400);
+ assert.equal(f.counts().reads,2);
 });
