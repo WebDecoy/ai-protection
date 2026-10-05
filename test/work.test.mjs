@@ -27,3 +27,24 @@ test('cancellation after execution begins retains unknown work and does not sett
 });
 
 test('observation records an exceeded allowance without claiming a hard ceiling',async t=>{const f=await setup(t,{response:'exceeded',mode:'observe'});assert.equal(await f.guard.run('read',{},null),4);await f.guard.flush();const start=f.events.find(e=>e.outcome==='attempted');assert.equal(start.checks[0].mode,'observe');assert.equal(start.checks[0].decision,'deny');assert.equal(f.executions(),1);});
+
+for(const scenario of ['complete','error','denied'])test(`hosted weighted-work evidence preserves ${scenario} phases and policy version`,async t=>{
+ const original=Error('private-provider-error');
+ const f=await setup(t,{response:scenario==='denied'?'exceeded':'ok',execute:()=>{if(scenario==='error')throw original;return 4;}});
+ if(scenario==='complete')assert.equal(await f.guard.run('read',{},null),4);
+ else await assert.rejects(f.guard.run('read',{},null),e=>scenario==='error'?e===original:e.status===429);
+ await f.guard.flush();
+ const reports=f.calls.filter(x=>x.tool_action);
+ const expected=scenario==='denied'?['not_attempted']:['attempted',scenario==='error'?'unknown':'completed'];
+ assert.deepEqual(reports.map(r=>r.tool_action.outcome).sort(),expected.sort());
+ assert.equal(new Set(reports.map(r=>r.tool_action.action_id)).size,1);
+ assert.equal(new Set(reports.map(r=>r.request_id)).size,reports.length);
+ for(const r of reports){
+  assert.equal(r.schema,2);assert.equal(r.tool_action.policy_version,'v1');
+  assert.equal(r.handler_attempted,scenario!=='denied');
+  assert.ok(r.tool_action.work);
+ }
+ assert.equal(f.executions(),scenario==='denied'?0:1);
+ assert.equal(f.calls.filter(x=>x.operation==='settle').length,scenario==='complete'?1:0);
+ assert.ok(!JSON.stringify(reports).includes('private-'));
+});
