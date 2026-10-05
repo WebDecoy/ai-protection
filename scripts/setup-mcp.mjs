@@ -20,7 +20,7 @@ export async function setupMCP({command,project,optionsFile}) {
  await regular(source);
  const manifest=JSON.parse(await regular(join(root,'package.json')));
  const dependencies={...manifest.devDependencies,...manifest.dependencies};
- const required={'@webdecoy/ai-protection':'0.1.0-alpha.17','@modelcontextprotocol/sdk':'1.31.0'};
+ const required={'@webdecoy/ai-protection':'0.1.0-alpha.18','@modelcontextprotocol/sdk':'1.31.0'};
  const checks=Object.entries(required).map(([name,version])=>({name,status:dependencies[name]===version?'configured':'unverified',remediation:`Use the tested exact version ${name}@${version}; other ranges require separate verification.`}));
  checks.push({name:'esm',status:manifest.type==='module'?'configured':'unsupported',remediation:'This scaffold supports TypeScript Node ESM projects with package.json type=module.'});
  const target=join(dirname(source),'webdecoy-mcp.ts');
