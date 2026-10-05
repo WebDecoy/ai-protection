@@ -104,3 +104,44 @@ may perform its own work; the probe does not sandbox the server.
 This cannot establish zero side effects in an arbitrary application from network
 responses alone. Independent callback counters and permitted/forbidden/cross-tenant
 synthetic tool fixtures are still required for action-enforcement acceptance.
+
+## Wire an explicitly marked Node route
+
+The separate source command below edits only two opt-in markers. This preview
+supports an LF TypeScript Node ESM module with a request callback whose parameters
+are named `req` and `res`. It does not detect arbitrary frameworks or migrate
+existing MCP server registrations. Place these exact unindented marker lines at
+module scope and inside the request callback before any competing MCP handler:
+
+```ts
+// WEBDECOY:MCP_IMPORT
+// ... your other imports and application initialization ...
+export function route(req: IncomingMessage, res: ServerResponse) {
+// WEBDECOY:MCP_ROUTE
+  // Existing non-MCP routing continues here.
+}
+```
+
+After creating the generated handler, review and apply:
+
+```sh
+node scripts/wire-mcp-route.mjs plan /absolute/path/to/app src/server.ts src/webdecoy-mcp.ts
+node scripts/wire-mcp-route.mjs apply /absolute/path/to/app src/server.ts src/webdecoy-mcp.ts
+node scripts/wire-mcp-route.mjs rollback /absolute/path/to/app src/server.ts src/webdecoy-mcp.ts
+```
+
+The plan prints only the marker replacements, not surrounding source or secrets.
+Apply adds the handler import and dispatches `/mcp` plus its protected-resource
+metadata path. Other paths continue through the original code. The command does
+not start a listener or remove earlier competing routes; review placement yourself.
+Compile, start the server and use the local route verifier afterward.
+
+Repeated apply is unchanged. Rollback restores the empty markers while retaining
+edits outside the generated blocks. Edits inside either generated block, duplicated
+markers, symlink paths, outside-project files and unsupported line endings are
+refused. Changes use a same-directory temporary file and atomic rename, after
+checking the original content again. Operate on a project at rest; this does not
+lock out concurrent editors. Roll back route wiring before removing the handler.
+
+Successful wiring still reports `coverage: not_verified`. It does not establish
+correct marker placement, authentication, per-tool permissions or shared controls.
