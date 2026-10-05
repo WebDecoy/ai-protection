@@ -66,7 +66,14 @@ export interface ActionLimits {
   tenantQuota?: ActionQuota;
   concurrency?: {ruleId:string;accountLimit:number;featureLimit:number;mode?:'observe'|'enforce';failureMode?:'open'|'closed';ttlSeconds?:number;maxSeconds?:number;timeoutMs?:number};
 }
+export interface ActionReportReceipt {
+ readonly schema:1;readonly eventId:string;readonly actionId:string;
+ /** HTTP success response only; not proof of retained dashboard evidence. */
+ readonly status:'accepted'|'unavailable';
+}
 export interface ActionRuntime {
+  /** Best-effort local HTTP reporting observer. Bounded to 100 pending calls; missing receipts remain unknown. Never contains raw response/error/identity data. */
+  onReport?(receipt:ActionReportReceipt):void|Promise<void>;
   /** Opt in to scoped caller pseudonyms in reports. Requires a supporting runtime. Default false. */
   reportCaller?:boolean;
   /** Opt-in online caller pause check before work. Requires reportCaller. Fails open on timeout (default 1000ms); no cache, retry or in-flight cancellation. */

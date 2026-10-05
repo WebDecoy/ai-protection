@@ -20,6 +20,15 @@ export function prepareActionRuntime(options, definitions) {
   if(config.callerPause && !config.reportCaller)throw Error('Caller pause requires caller reporting');
   const pauseTimeout=config.callerPauseTimeoutMs??1000;
   if(!Number.isInteger(pauseTimeout)||pauseTimeout<1||pauseTimeout>10000)throw Error('Invalid caller pause timeout');
+  if(config.onReport !== undefined && typeof config.onReport !== 'function')throw Error('Invalid reporting observer');
+  const reportingObserver=config.onReport;
+  let pendingObservers=0;
+  const observeReport=(event,status)=>{
+    if(!reportingObserver||pendingObservers>=100)return;
+    pendingObservers++;
+    const receipt=Object.freeze({schema:1,eventId:event.eventId,actionId:event.actionId,status});
+    Promise.resolve().then(()=>reportingObserver(receipt)).catch(()=>{}).finally(()=>{pendingObservers--;});
+  };
   const c={...config};const limits=new Map(),ruleIDs=new Set();
   const subject=(ctx,tenant)=>({accountId:tenant?quotaHash(c.subjectSecret,'webdecoy.actions.tenant.v1',ctx.caller.tenant):quotaHash(c.subjectSecret,'webdecoy.actions.caller.v1',ctx.caller.issuer,ctx.caller.tenant,ctx.caller.subject)});
   for(const [name,d] of definitions){
@@ -47,9 +56,12 @@ export function prepareActionRuntime(options, definitions) {
         degraded:event.checks.some(c=>c.decision==='unavailable'),checks,handler_attempted:event.attempted,
         action:event.decision==='deny'?'denied':event.outcome==='unknown'?'handler_error':'forwarded',
         tool_action:{action_id:event.actionId,name:event.action,policy_version:event.policyVersion,outcome:event.outcome,...(event.toolSchema?{tool_schema:{server_id:event.toolSchema.serverId,hash:event.toolSchema.hash,...(event.toolSchema.decoy?{decoy:event.toolSchema.decoy}:{}),...(event.toolSchema.effect?{effect:event.toolSchema.effect}:{}),...(event.toolSchema.permissions?{permissions:event.toolSchema.permissions}:{})}}:{}),...(event.caller?{caller:event.caller}:{}),...(event.work?{work:event.work}:{})}};
-      const response=await fetch(new URL('/api/v1/sdk/ai-abuse/reports',url),{method:'POST',redirect:'error',signal,
-        headers:{Authorization:`Bearer ${c.webdecoyKey}`,'X-WebDecoy-Property-ID':c.propertyId,'Content-Type':'application/json'},body:JSON.stringify(payload)});
-      await response.body?.cancel();if(!response.ok)throw Error('Action reporting unavailable');
+      try {
+        const response=await fetch(new URL('/api/v1/sdk/ai-abuse/reports',url),{method:'POST',redirect:'error',signal,
+          headers:{Authorization:`Bearer ${c.webdecoyKey}`,'X-WebDecoy-Property-ID':c.propertyId,'Content-Type':'application/json'},body:JSON.stringify(payload)});
+        await response.body?.cancel();if(!response.ok)throw Error('Action reporting unavailable');
+        observeReport(event,'accepted');
+      } catch(error) { observeReport(event,'unavailable'); throw error; }
     }});
   const checkCallerPause = c.callerPause ? async (caller,signal) => {
     signal.throwIfAborted();const started=performance.now();

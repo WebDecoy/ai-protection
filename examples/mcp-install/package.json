@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {"build": "tsc", "start": "node dist/start.js"},
-  "dependencies": {"@webdecoy/ai-protection": "0.1.0-alpha.16", "@modelcontextprotocol/sdk": "1.31.0"},
+  "dependencies": {"@webdecoy/ai-protection": "0.1.0-alpha.17", "@modelcontextprotocol/sdk": "1.31.0"},
   "devDependencies": {"typescript": "6.0.3", "@types/node": "22.19.15"}
 }

@@ -22,7 +22,7 @@ node scripts/setup-mcp.mjs rollback /absolute/path/to/app src/mcp-options.ts
 
 `plan` reads bounded package/source files and prints a proposed addition plus
 metadata checks. Review it first. `apply` requires exact tested dependency pins
-(`@webdecoy/ai-protection@0.1.0-alpha.16`, MCP SDK `1.31.0`) and `type: module`.
+(`@webdecoy/ai-protection@0.1.0-alpha.17`, MCP SDK `1.31.0`) and `type: module`.
 Other dependency ranges are unverified, not automatically upgraded. It creates
 `webdecoy-mcp.ts` beside the selected module using exclusive creation. Repeating
 apply is a no-op when the contents match; an existing different file is untouched.
@@ -145,3 +145,40 @@ lock out concurrent editors. Roll back route wiring before removing the handler.
 
 Successful wiring still reports `coverage: not_verified`. It does not establish
 correct marker placement, authentication, per-tool permissions or shared controls.
+
+## Inspect configured and observed controls
+
+From the source checkout, import `inspectMCPControls` and `collectMCPDiagnostics`
+from `scripts/inspect-mcp-controls.mjs` into an owned server verification harness:
+
+```js
+const diagnostics = collectMCPDiagnostics();
+const inspected = inspectMCPControls(mcpOptions);
+// Compose these with any existing application observers.
+mcpOptions.onEvent = diagnostics.onEvent;
+if (mcpOptions.sharedRuntime) {
+  mcpOptions.sharedRuntime.onReport = diagnostics.onReport;
+}
+console.log(JSON.stringify(inspected));
+// After explicitly selected synthetic calls finish:
+console.log(JSON.stringify(diagnostics.snapshot()));
+```
+
+Inspection runs actual adapter startup validation without invoking authentication,
+validation, authorization or tool callbacks and without network requests. It shows
+which controls are unconfigured, the actual observe/enforce and open/closed defaults,
+timeouts and how configured exhaustion/unavailability is handled. Rule IDs, scope
+names, credentials, subject secrets, schemas and resource URLs are omitted.
+
+The bounded collector retains at most 1,000 events and 1,000 reporting receipts.
+It shows observed action phases and control checks, correlating receipts by event
+and action ID. `accepted` means the reporting HTTP endpoint returned success;
+it does not prove database retention or visibility in the dashboard. Failed
+requests are `unavailable`. Absent receipts remain `missingOrPending`: dropped
+queues, hung observers or shutdown may prevent evidence. Collector drops are explicit.
+
+`onReport` requires Node alpha.17 or later. It is best effort, limited to 100 pending
+local observer calls, with no effect on tool results or reporting retries. The
+receipt contains only schema, event ID, action ID and accepted/unavailable status.
+Model correlation, model-budget settlement and alternate handlers remain unverified
+by tool-action observations. Browser receipts are unsupported by this MCP adapter.
