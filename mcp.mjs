@@ -31,7 +31,6 @@ export function createProtectedMCPHandler(options) {
         }
     }
     // Validate the closed registry at startup, not only after a client arrives.
-    createActionProtection({ policyVersion: options.policyVersion, authenticate: options.authenticate, actions: tools, sharedRuntime: options.sharedRuntime });
     for (const tool of Object.values(tools))
         for (const scope of tool.requiredScopes)
             if (!/^[\x21\x23-\x5b\x5d-\x7e]+$/.test(scope))
@@ -50,6 +49,8 @@ export function createProtectedMCPHandler(options) {
         [name, createHash('sha256').update(canonical(JSON.parse(JSON.stringify(tool.inputSchema)))).digest('hex')])) : {};
     if (options.discovery) for (const [name, tool] of Object.entries(tools))
         tool.toolSchema = Object.freeze({serverId:options.discovery.serverId,hash:hashes[name],...(decoys.has(name)?{decoy:decoys.get(name)}:{effect:inferToolEffect(name,tool.inputSchema,tool.annotations),permissions:Object.freeze({schema:1,required_scopes:tool.requiredScopes.length,application_authorization:true,additional_policy:typeof tool.policy==='function'})})});
+    // Validate after discovery supplies the schema required by tool pauses.
+    createActionProtection({ policyVersion: options.policyVersion, authenticate: options.authenticate, actions: tools, sharedRuntime: options.sharedRuntime });
     const runtime = options.sharedRuntime && { ...options.sharedRuntime };
     const serverId = options.discovery?.serverId;
     const catalogReporter = options.discovery ? createReporter({

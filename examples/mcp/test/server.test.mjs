@@ -302,3 +302,19 @@ test('stateless SSE responses correlate string and numeric IDs without session o
  assert.equal((await f.post(call('records.read'),{headers:{'Last-Event-ID':'invented-resume'}})).status,400);
  assert.equal(f.counts().reads,2);
 });
+
+test('MCP tool pauses receive generated schema metadata before startup validation',async t=>{
+ const propertyId='11111111-1111-4111-8111-111111111111';const checked=[];
+ const server=createServer(async(req,res)=>{
+  let raw='';for await(const chunk of req)raw+=chunk;const body=JSON.parse(raw);
+  if(req.url.endsWith('/reports')){res.writeHead(202);res.end();return;}
+  assert.ok(req.url.endsWith('/caller-pause'));checked.push(body);
+  res.setHeader('content-type','application/json');
+  res.end(JSON.stringify({schema:2,property_id:propertyId,caller:'',server_id:'pause-fixture',tool:'records.read',caller_control:null,tool_control:{allowed:false,reason:'tool_paused',control_revision:null}}));
+ });await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>{server.closeAllConnections();return new Promise(r=>server.close(r));});
+ const f=await fixture(t,{discovery:{serverId:'pause-fixture'},sharedRuntime:{webdecoyUrl:`http://127.0.0.1:${server.address().port}`,propertyId,webdecoyKey:'fixture',subjectSecret:'x'.repeat(32),toolPause:true}});
+ const client=await connectClient(t,f);
+ const response=await client.callTool({name:'records.read',arguments:{id:'a'}});
+ assert.equal(response.isError,true);assert.equal(response._meta['webdecoy.com/action-error'].reason,'tool_paused');assert.equal(f.counts().reads,0);
+ assert.equal(checked.length,1);assert.equal(checked[0].server_id,'pause-fixture');assert.equal(checked[0].tool,'records.read');
+});

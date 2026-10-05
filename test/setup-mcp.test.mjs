@@ -8,7 +8,7 @@ import {tmpdir} from 'node:os';
 import {setupMCP} from '../scripts/setup-mcp.mjs';
 async function fixture(t,overrides={}){
  const project=await mkdtemp(join(tmpdir(),'wd-setup-'));t.after(()=>rm(project,{recursive:true,force:true}));
- await writeFile(join(project,'package.json'),JSON.stringify({type:'module',dependencies:{'@webdecoy/ai-protection':'0.1.0-alpha.16','@modelcontextprotocol/sdk':'1.31.0'},scripts:{prepare:'DO NOT RUN'},...overrides}));
+ await writeFile(join(project,'package.json'),JSON.stringify({type:'module',dependencies:{'@webdecoy/ai-protection':'0.1.0-alpha.17','@modelcontextprotocol/sdk':'1.31.0'},scripts:{prepare:'DO NOT RUN'},...overrides}));
  // An installer must never import or execute this selected module.
  await writeFile(join(project,'options.ts'),"throw new Error('project code executed');");
  return {project,optionsFile:'options.ts'};

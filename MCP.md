@@ -398,3 +398,14 @@ dashboard to show an SDK-reported tool denial separately from saved state.
 ## Caller identity and secret rotation
 
 See the [schema-1 caller contract](https://github.com/WebDecoy/ai-protection/blob/main/CALLER_IDENTITY.md) for authenticated/claimed/unavailable distinctions, Node/Go bounds, OAuth client separation, unsupported delegation/signers and caller pseudonym retention/rotation.
+
+## Local reporting diagnostics (alpha.17)
+
+`sharedRuntime.onReport(receipt)` is an optional best-effort local callback for an
+HTTP report result. Receipts contain `schema: 1`, `eventId`, `actionId` and
+`status: 'accepted' | 'unavailable'`. Correlate with the same IDs in `onEvent`.
+Accepted means HTTP success; inspect dashboard evidence separately for retention.
+Missing receipts are unknown, including queue drops or shutdown. At most 100
+report observers can be pending per action guard; exceptions or hung observers do
+not rerun tool work or change its result. Do not put protected side effects in
+observers. See the source [setup diagnostics](examples/mcp/SETUP.md).
