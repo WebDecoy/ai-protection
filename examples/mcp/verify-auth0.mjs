@@ -9,12 +9,15 @@ import {StreamableHTTPClientTransport} from '@modelcontextprotocol/sdk/client/st
 import {createProtectedMCPHandler} from './dist/server.js';
 import {createAuth0Authenticator} from '../auth0/authenticate.mjs';
 
-export async function verifyAuth0({issuer,resource,subject,organization,token,fetcher}) {
-  if(!subject || !organization || typeof token!=='string' || token.length>16384 ||
+export async function verifyAuth0({issuer,resource,subject,organization,machineClientId,token,fetcher}) {
+  const machine=typeof machineClientId==='string' && machineClientId.length>0;
+  if((machine ? Boolean(subject||organization)||!/^[A-Za-z0-9_-]{1,128}$/.test(machineClientId) : !subject||!organization) || typeof token!=='string' || token.length>16384 ||
     !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token))throw Error('Invalid verification configuration');
   const external=new URL(resource);
   const authenticate=createAuth0Authenticator({issuer,audience:resource,fetcher,
-    resolveTenant:claims=>claims.subject===subject&&claims.organizationId===organization?'owned-tenant':null});
+    resolveTenant:claims=>(machine
+      ? claims.subject===machineClientId+'@clients'&&claims.clientId===machineClientId&&claims.organizationId===undefined
+      : claims.subject===subject&&claims.organizationId===organization)?'owned-tenant':null});
   // Confirm real credential and configured membership before opening the test server.
   const caller=await authenticate(new Request(resource,{headers:{Authorization:'Bearer '+token}}));
   if(!caller.scopes.includes('records:read')||caller.scopes.includes('records:export'))throw Error('Use a read-only test token');
@@ -97,7 +100,7 @@ async function main(){
     token=(await file.readFile('utf8')).trim();
   } finally {await file.close();}
   const result=await verifyAuth0({issuer:process.env.AUTH0_ISSUER,resource:process.env.MCP_RESOURCE,
-    subject:process.env.AUTH0_SUBJECT,organization:process.env.AUTH0_ORGANIZATION,token});
+    subject:process.env.AUTH0_SUBJECT,organization:process.env.AUTH0_ORGANIZATION,machineClientId:process.env.AUTH0_MACHINE_CLIENT_ID,token});
   console.log(JSON.stringify(result));
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
