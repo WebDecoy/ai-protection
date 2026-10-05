@@ -11,7 +11,7 @@ resource authorization.
 Available in `0.1.0-alpha.5` and later compatible alpha releases:
 
 ```sh
-npm install @webdecoy/ai-protection@0.1.0-alpha.11 @modelcontextprotocol/sdk@1.31.0
+npm install @webdecoy/ai-protection@0.1.0-alpha.17 @modelcontextprotocol/sdk@1.31.0
 ```
 
 Requires Node 22.22.3+ and MCP SDK **1.31.0**. The MCP SDK is an optional peer, so
