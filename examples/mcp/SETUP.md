@@ -76,3 +76,31 @@ per-tool mode or failure policy: those also depend on the local application
 options. `effectiveToolControls` and route `coverage` remain `not_verified`.
 Credential success does not establish caller authentication, permission checks,
 model/request correlation, budget settlement or evidence delivery.
+
+## Verify a selected local route
+
+After wiring and starting your owned local server, provide `MCP_RESOURCE` (for
+example `http://127.0.0.1:8093/mcp`) and `MCP_TEST_TOKEN` through the environment:
+
+```sh
+node scripts/verify-mcp-route.mjs
+```
+
+This source-only probe accepts numeric HTTP loopback addresses and the exact
+`/mcp` path. The server's configured resource URL must match. It first sends
+unauthenticated and intentionally invalid-credential pings; both must return 401.
+It checks resource metadata on the same origin, then uses the official pinned MCP
+client to initialize, ping and list tools with the supplied credential. It does
+not follow redirects or discovery URLs to other servers. Responses are bounded
+at 64 KiB with a two-second per-request deadline. Tokens, tool names and response
+bodies are not printed.
+
+Exit 0 verifies only that selected local protocol/authentication boundary. The
+report lists unverified controls explicitly. No `tools/call` requests are sent;
+there is no inference/provider fallback. Listing tools can emit discovery reports
+if your server enables that feature. As with any request, application middleware
+may perform its own work; the probe does not sandbox the server.
+
+This cannot establish zero side effects in an arbitrary application from network
+responses alone. Independent callback counters and permitted/forbidden/cross-tenant
+synthetic tool fixtures are still required for action-enforcement acceptance.
