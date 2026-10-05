@@ -39,6 +39,8 @@ try {
   writeFileSync(join(consumer,'mcp-types.mts'),readFileSync(new URL('../test/mcp-types.mts',import.meta.url)));
   execFileSync(process.execPath,[new URL('../node_modules/typescript/bin/tsc',import.meta.url).pathname,'--strict','--noEmit','--module','nodenext','--target','es2022','mcp-types.mts'],{cwd:consumer,stdio:'pipe'});
   console.log('Verified packed MCP transport, real-client behavior, and public TypeScript declarations.');
+  process.stdout.write(execFileSync(process.execPath,['--test',new URL('../test/mcp-install-flow.test.mjs',import.meta.url).pathname],{cwd:consumer,env:{...process.env,WEBDECOY_INSTALL_SDK_ROOT:join(consumer,'node_modules/@webdecoy/ai-protection')},encoding:'utf8'}));
+  console.log('Verified clean setup, route wiring, dispatch, cancellation and rollback against the packed SDK.');
 } catch (error) {
   if (error.stdout?.length) process.stderr.write(error.stdout);
   if (error.stderr?.length) process.stderr.write(error.stderr);
