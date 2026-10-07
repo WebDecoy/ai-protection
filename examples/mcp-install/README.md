@@ -31,6 +31,14 @@ denies; `wait` blocks until the request is cancelled. Avoid calling `wait` from 
 client that cannot cancel. `/health` remains outside the protected MCP route.
 The route probe only initializes/pings/lists; it does not call these tools.
 
+To run the allowed, forbidden, cross-tenant and cancellation calls as well, use
+the sample plan (synthetic fixture tokens only):
+
+```sh
+node scripts/doctor-mcp.mjs detect /tmp/my-mcp-sample
+MCP_TEST_TOKEN_A=owned-a MCP_TEST_TOKEN_B=owned-b node scripts/doctor-mcp.mjs check examples/mcp-install/doctor-plan.json
+```
+
 Repeat the apply commands to verify no-op behavior. To remove the integration,
 stop the server, rollback wiring first, then the handler, clean the build directory
 and rebuild/restart. An already-running process does not change when files change.
