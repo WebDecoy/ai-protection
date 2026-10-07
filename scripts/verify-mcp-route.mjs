@@ -3,24 +3,34 @@ import {pathToFileURL} from 'node:url';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StreamableHTTPClientTransport} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
-export async function verifyMCPRoute({resource,token,timeoutMs=2000}){
- const checks=[];let client;
- const report=passed=>({schema:1,passed,checks,coverage:'selected_local_mcp_protocol_only',toolCallsSent:0,unverified:['tool authorization and tenant ownership','callback execution and side effects','effective shared limits and failure policies','reporting and model budgets','alternate routes']});
- let endpoint;
- try{
-  endpoint=new URL(resource);
-  if(endpoint.protocol!=='http:'||!['127.0.0.1','[::1]'].includes(endpoint.hostname)||endpoint.pathname!=='/mcp'||endpoint.search||endpoint.hash||endpoint.username||endpoint.password||typeof token!=='string'||!token||token.length>16384||/[\r\n]/.test(token)||!Number.isInteger(timeoutMs)||timeoutMs<1||timeoutMs>10000)throw Error();
- }catch{checks.push({name:'configuration',status:'unconfigured',remediation:'Use an owned HTTP loopback /mcp route and a server-provided token; no production endpoints.'});return report(false);}
- const metadata=new URL('/.well-known/oauth-protected-resource/mcp',endpoint);
- const boundedFetch=async(url,options={})=>{
+const metadataPath='/.well-known/oauth-protected-resource/mcp';
+/** The one rule for which endpoints local MCP checks may contact: owned HTTP loopback /mcp. */
+export function loopbackMCPEndpoint(resource){
+ const endpoint=new URL(resource);
+ if(endpoint.protocol!=='http:'||!['127.0.0.1','[::1]'].includes(endpoint.hostname)||endpoint.pathname!=='/mcp'||endpoint.search||endpoint.hash||endpoint.username||endpoint.password)throw Error('Unsupported endpoint');
+ return endpoint;
+}
+/** Fetch limited to the selected endpoint and its metadata: bounded time and body, no redirects. */
+export function boundedMCPFetch(endpoint,timeoutMs){
+ return async(url,options={})=>{
   const target=new URL(url);
-  if(target.origin!==endpoint.origin||![endpoint.pathname,metadata.pathname].includes(target.pathname)||target.search||target.hash)throw Error('Unexpected destination');
+  if(target.origin!==endpoint.origin||![endpoint.pathname,metadataPath].includes(target.pathname)||target.search||target.hash)throw Error('Unexpected destination');
   const signal=AbortSignal.any([AbortSignal.timeout(timeoutMs),...(options.signal?[options.signal]:[])]);
   const response=await fetch(target,{...options,redirect:'error',signal});
   const parts=[];let bytes=0;const reader=response.body?.getReader();
   if(reader)for(;;){const {done,value}=await reader.read();if(done)break;bytes+=value.byteLength;if(bytes>65536){await reader.cancel();throw Error('Response limit');}parts.push(Buffer.from(value));}
   return new Response([204,205,304].includes(response.status)?null:Buffer.concat(parts),{status:response.status,headers:response.headers});
  };
+}
+export async function verifyMCPRoute({resource,token,timeoutMs=2000}){
+ const checks=[];let client;
+ const report=passed=>({schema:1,passed,checks,coverage:'selected_local_mcp_protocol_only',toolCallsSent:0,unverified:['tool authorization and tenant ownership','callback execution and side effects','effective shared limits and failure policies','reporting and model budgets','alternate routes']});
+ let endpoint;
+ try{
+  endpoint=loopbackMCPEndpoint(resource);
+  if(typeof token!=='string'||!token||token.length>16384||/[\r\n]/.test(token)||!Number.isInteger(timeoutMs)||timeoutMs<1||timeoutMs>10000)throw Error();
+ }catch{checks.push({name:'configuration',status:'unconfigured',remediation:'Use an owned HTTP loopback /mcp route and a server-provided token; no production endpoints.'});return report(false);}
+ const metadata=new URL(metadataPath,endpoint),boundedFetch=boundedMCPFetch(endpoint,timeoutMs);
  let stage='missing_credentials';
  try{
   const ping=JSON.stringify({jsonrpc:'2.0',id:1,method:'ping'});

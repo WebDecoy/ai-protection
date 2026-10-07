@@ -3,8 +3,11 @@
 This command scaffolds a handler for a selected Node TypeScript ESM options module.
 It is available from this SDK source checkout, not an npm binary. It does not
 install dependencies, rewrite an existing server, run project code or prove a live
-integration. Next.js, Go, stateful MCP and automatic framework detection are not
-supported by this command.
+integration. Next.js, Go and stateful MCP are not supported by this command.
+
+Start with `doctor-mcp.mjs detect` (below) to find your options module and route
+file and get the exact commands for your project. Finish with `doctor-mcp.mjs
+check` to run your own synthetic calls against the running route.
 
 Prepare an existing options module that exports `mcpOptions` typed as
 `ProtectedMCPOptions` from `@webdecoy/ai-protection/mcp`. Use the [MCP integration
@@ -34,7 +37,85 @@ Compile with your own build, then connect the exported `protectedMCPHandler` onl
 to the intended `/mcp` route. The command cannot verify the selected module's
 export or route wiring by reading package metadata. It creates no listening server
 and does not remove alternate handlers. Remove your manual route wiring before
-rollback. Broad installation, runtime diagnostics and route edits remain #1408.
+rollback.
+
+## Detect your layout and get the next steps
+
+```sh
+node scripts/doctor-mcp.mjs detect /absolute/path/to/app
+```
+
+`detect` reads `package.json`, `go.mod` and up to 400 bounded source files. It
+never imports, compiles or runs project code and skips symlinks, `node_modules`,
+build output and hidden directories. It reports:
+
+- the runtime (`node-esm`, `node-cjs`, `go`) and whether the layout is supported:
+  a TypeScript Node ESM HTTP server is; Next.js has its own [admission
+  contract](../../NEXTJS.md); Express, Fastify, Hono, Koa, CommonJS, plain
+  JavaScript and Go get a specific instruction instead of generated edits;
+- candidate `mcpOptions` modules, marked route files, generated handlers and
+  Node servers;
+- MCP servers built directly on the MCP SDK. Their tools bypass the WebDecoy
+  handler and are listed as uncovered;
+- the state (`not_integrated`, `handler_generated`, `wired`) and the next
+  commands with your files filled in. Every proposed command has a `plan` mode
+  that changes nothing. On an already integrated app only `check` is proposed.
+
+When more than one candidate matches, nothing is chosen for you: pass the file
+you mean explicitly.
+
+## Check the running route with your own synthetic calls
+
+Write a plan naming synthetic callers and the calls you expect to be allowed or
+refused. Tokens are read from the environment variables you name, never from the
+plan, and never appear in the output. Use test accounts, not real customer data.
+
+```json
+{
+  "schema": 1,
+  "resource": "http://127.0.0.1:8093/mcp",
+  "propertyId": "00000000-0000-4000-8000-000000000000",
+  "callers": {
+    "owner": {"tokenEnv": "MCP_TEST_TOKEN_A"},
+    "other": {"tokenEnv": "MCP_TEST_TOKEN_B"}
+  },
+  "checks": [
+    {"kind": "allowed", "caller": "owner", "tool": "read", "arguments": {"id": "a"}},
+    {"kind": "forbidden", "caller": "owner", "tool": "admin"},
+    {"kind": "cross_tenant", "caller": "owner", "tool": "read", "arguments": {"id": "b"}},
+    {"kind": "cancellation", "caller": "owner", "tool": "wait", "afterMs": 200}
+  ]
+}
+```
+
+```sh
+MCP_TEST_TOKEN_A=... MCP_TEST_TOKEN_B=... node scripts/doctor-mcp.mjs check plan.json
+```
+
+`check` first runs the route verification above, then each call through the
+official MCP client on the same loopback route, with bounded time and body and no
+redirects. It exits non-zero unless every check is `verified`:
+
+| Kind | Verified when |
+| --- | --- |
+| `allowed` | the tool returns a result with no WebDecoy denial |
+| `forbidden` | WebDecoy denies with `permission_denied`, `missing_scope`, `policy_denied` or `action_not_registered`, or the route refuses with HTTP 403 `insufficient_scope` |
+| `cross_tenant` | WebDecoy denies with `permission_denied`, `invalid_arguments` or `policy_denied` |
+| `cancellation` | the client cancels after `afterMs` and the server still answers. A call that finishes first is `inconclusive`, not a pass |
+
+A refusal for an unexpected reason fails: an input-validation error does not
+prove the permission control. Each failed check says what to change.
+
+The report lists the routes, tools and callers it actually exercised, and what it
+did not: runtime outages, alternate routes and unwrapped handlers, model budgets,
+and tool progress streaming. Tool callbacks run in your process, so `check` cannot
+count them; it reports protocol evidence. To count callbacks, use
+`collectMCPDiagnostics` (below) or your own counters, as the sample does.
+
+With `propertyId`, the report gives the AI Protection dashboard page for that
+property and the time window of the run. Results appear there only if your server
+reports to WebDecoy through `sharedRuntime`; reporting is best effort, and a
+single action is not linked individually.
 
 ## Interpretation of results
 

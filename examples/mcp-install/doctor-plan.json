@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "resource": "http://127.0.0.1:8093/mcp",
+  "callers": {
+    "owner": {"tokenEnv": "MCP_TEST_TOKEN_A"},
+    "other": {"tokenEnv": "MCP_TEST_TOKEN_B"}
+  },
+  "checks": [
+    {"kind": "allowed", "caller": "owner", "tool": "read", "arguments": {"id": "a"}},
+    {"kind": "allowed", "caller": "other", "tool": "read", "arguments": {"id": "b"}},
+    {"kind": "forbidden", "caller": "owner", "tool": "admin"},
+    {"kind": "cross_tenant", "caller": "owner", "tool": "read", "arguments": {"id": "b"}},
+    {"kind": "cancellation", "caller": "owner", "tool": "wait", "afterMs": 200}
+  ]
+}
