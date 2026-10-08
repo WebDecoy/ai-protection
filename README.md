@@ -374,6 +374,9 @@ and maps tenant membership. The [MCP adapter](MCP.md) provides a separate `/mcp`
 HTTP tool dispatch starting in `0.1.0-alpha.4`.
 It requires the optional, pinned MCP SDK peer. Optional shared quotas, concurrency and hosted
 action events are documented in the action guide and use the hosted AI Protection runtime and dashboard.
+To install it, start with `scripts/doctor-mcp.mjs detect`, then verify the running route (including an
+outage) with `doctor-mcp.mjs check`; see the [MCP setup guide](examples/mcp/SETUP.md). From `alpha.19`,
+every tool result carries the action ID used in its reported evidence.
 
 ## Weighted tool work (Alpha)
 
