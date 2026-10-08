@@ -1,4 +1,4 @@
-# Caller identity in the Alpha action boundary
+# Caller identity in the action boundary
 
 The application authenticates the original incoming request. WebDecoy validates
 and copies the resulting `TrustedCaller` schema 1; it does not verify that
@@ -81,9 +81,9 @@ Language-native malformed Unicode is tested separately. This validates the share
 core contract, not OAuth provider issuance, signed-agent identity or parity of
 optional runtime features. Language representation differences above stay explicit.
 
-## Alpha scope decision: delegation and signers
+## Scope decision: delegation and signers
 
-Alpha supports an application-authenticated subject, canonical tenant, scopes and
+The Beta supports an application-authenticated subject, canonical tenant, scopes and
 optional OAuth client. It does not interpret token-exchange actor chains, establish
 an agent brand's identity or issue credentials. Delegation and agent signer evidence
 are **unavailable** in schema 1. A claimed label remains untrusted application data.
@@ -93,7 +93,7 @@ The Auth0 reference verifier rejects `act` and `may_act`; other application veri
 must make the same scope decision explicitly. Existing scopes can restrict a
 credential, but do not establish an actor chain. No scope, signer or client field
 can override application membership or resource ownership. This is a product
-boundary for Alpha, not a claim that delegated access is implemented.
+boundary for the Beta, not a claim that delegated access is implemented.
 
 Revisit actor-chain support for a concrete customer using token exchange. Required
 work would include separate actor/subject identities, trusted issuer relationships,
