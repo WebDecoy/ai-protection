@@ -164,3 +164,68 @@ test('check refuses unsafe or incomplete plans before contacting anything',async
  const down=await checkMCPRoute({plan:base,env,timeoutMs:200});
  assert.equal(down.route.passed,false);assert.deepEqual(down.checks.map(c=>c.status),['not_run']);assert.deepEqual(down.exercised.routes,[]);
 });
+
+async function freePort(){const s=createServer();await new Promise(r=>s.listen(0,'127.0.0.1',r));const {port}=s.address();await new Promise(r=>s.close(r));return port;}
+async function limitedServer(t,{runtimePort,closedFailureMode='closed'}){
+ let handler;const calls={open:0,closed:0,denied:0};
+ const server=createServer((req,res)=>void handler(req,res));await new Promise(r=>server.listen(0,'127.0.0.1',r));
+ t.after(()=>{server.closeAllConnections();return new Promise(r=>server.close(r));});
+ const resource=`http://127.0.0.1:${server.address().port}/mcp`;
+ const limit=(ruleId,failureMode)=>({callerQuota:{ruleId,limit:100,windowSeconds:3600,mode:'enforce',failureMode,timeoutMs:500}});
+ handler=createProtectedMCPHandler({resource,authorizationServer:'https://issuer.example/',policyVersion:'v1',
+  sharedRuntime:{webdecoyUrl:`http://127.0.0.1:${runtimePort}`,webdecoyKey:'synthetic-key',propertyId:property,subjectSecret:'s'.repeat(32)},
+  authenticate:async request=>{if(request.headers.get('authorization')!=='Bearer owned-a'&&request.headers.get('authorization')!=='Bearer owned-b')throw Error('Invalid');return {schema:1,subject:'s',tenant:'a',issuer:'fixture',authenticationMethod:'session',scopes:[],expiresAt:Date.now()+60000};},
+  tools:{
+   open:{inputSchema:{type:'object'},requiredScopes:[],validate:()=>true,authorize:()=>true,limits:limit('open_v1','open'),execute:()=>{calls.open++;return {content:[{type:'text',text:'ok'}]};}},
+   closed:{inputSchema:{type:'object'},requiredScopes:[],validate:()=>true,authorize:()=>true,limits:limit('closed_v1',closedFailureMode),execute:()=>{calls.closed++;return {content:[]};}},
+   denied:{inputSchema:{type:'object'},requiredScopes:[],validate:()=>true,authorize:()=>false,limits:limit('denied_v1','open'),execute:()=>{calls.denied++;return {content:[]};}},
+  }});
+ return {resource,calls};
+}
+const outageChecks=[
+ {kind:'allowed',caller:'owner',tool:'open'},
+ {kind:'closed_limit',caller:'owner',tool:'closed'},
+ {kind:'forbidden',caller:'owner',tool:'denied'},
+];
+
+test('outage run: open limits admit, closed limits refuse, permissions still hold',async t=>{
+ const port=await freePort(),{resource,calls}=await limitedServer(t,{runtimePort:port});
+ const report=await checkMCPRoute({env,plan:plan(resource,outageChecks,{outageRuntime:{port}})});
+ assert.equal(report.passed,true,JSON.stringify(report.checks));
+ assert.deepEqual(report.checks.map(c=>c.status),['verified','verified','verified']);
+ assert.equal(report.checks[1].observed.status,503);
+ assert.deepEqual(calls,{open:1,closed:0,denied:0});
+ assert.ok(report.outageRuntime.controlRequests>=2,JSON.stringify(report.outageRuntime));
+ assert.equal(report.outageRuntime.response,503);
+ assert.ok(!report.notExercised.some(n=>n.startsWith('runtime outages')));
+});
+
+test('outage run flags a hard limit that fails open',async t=>{
+ const port=await freePort(),{resource,calls}=await limitedServer(t,{runtimePort:port,closedFailureMode:'open'});
+ const report=await checkMCPRoute({env,plan:plan(resource,[...outageChecks,{kind:'closed_limit',caller:'owner',tool:'denied'}],{outageRuntime:{port}})});
+ assert.equal(report.passed,false);
+ assert.equal(report.checks[1].status,'failed');assert.match(report.checks[1].remediation,/failureMode 'closed'/);
+ // A permission denial (403) is not evidence of a closed limit.
+ assert.equal(report.checks[3].status,'failed');assert.deepEqual(report.checks[3].observed,{reason:'permission_denied',status:403});
+ assert.equal(calls.closed,1);
+});
+
+test('outage results are inconclusive when the server never asked the stand-in',async t=>{
+ // The server talks to a different (dead) port, so its outage behavior was not caused by this run.
+ const port=await freePort(),{resource}=await limitedServer(t,{runtimePort:await freePort()});
+ const report=await checkMCPRoute({env,plan:plan(resource,outageChecks,{outageRuntime:{port}})});
+ assert.equal(report.passed,false);
+ assert.deepEqual(report.checks.map(c=>c.status),['inconclusive','inconclusive','verified']);
+ assert.equal(report.outageRuntime.controlRequests,0);
+ assert.match(report.checks[0].remediation,new RegExp(`127\\.0\\.0\\.1:${port}`));
+ assert.ok(report.notExercised.some(n=>n.startsWith('runtime outages')));
+});
+
+test('outage plans are validated and a busy port is refused',async t=>{
+ const base=plan('http://127.0.0.1:9/mcp',[{kind:'closed_limit',caller:'owner',tool:'closed'}]);
+ assert.match((await checkMCPRoute({env,plan:base})).checks[0].remediation,/need outageRuntime/);
+ for(const bad of [{port:80},{port:'8787'},{port:8787,host:'0.0.0.0'}])assert.match((await checkMCPRoute({env,plan:{...base,outageRuntime:bad}})).checks[0].remediation,/outageRuntime needs only a port/);
+ const busy=createServer();await new Promise(r=>busy.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>busy.close(r)));
+ const r=await checkMCPRoute({env,plan:{...base,outageRuntime:{port:busy.address().port}}});
+ assert.equal(r.checks[0].name,'outage_runtime');assert.equal(r.checks[0].status,'unconfigured');assert.equal(r.route,null);
+});
