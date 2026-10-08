@@ -1,6 +1,7 @@
 import {lstat,readFile,readdir,realpath} from 'node:fs/promises';
 import {join,relative,resolve,sep} from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {createServer} from 'node:http';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StreamableHTTPClientTransport} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import {verifyMCPRoute,loopbackMCPEndpoint,boundedMCPFetch} from './verify-mcp-route.mjs';
@@ -74,7 +75,22 @@ export async function detectMCPProject({project}){
   coverage:'not_verified',remediation:layouts.length?'Review each proposed step; every command has a plan mode that changes nothing.':'No supported layout was detected. See the unsupported list for what to do instead.'};
 }
 
-const kinds=new Set(['allowed','forbidden','cross_tenant','cancellation']);
+const kinds=new Set(['allowed','forbidden','cross_tenant','cancellation','closed_limit']);
+const runtimeOperations=new Set(['quota','concurrency','work','caller-pause','reports','config','budget','usage']);
+/**
+ * Stand-in WebDecoy runtime for an outage run: answers every request with 503
+ * and counts them by operation. Loopback only; request bodies are discarded.
+ */
+async function startOutageRuntime(port){
+ const counts={};
+ const server=createServer((req,res)=>{
+  const op=/^\/api\/v1\/sdk\/ai-abuse\/([a-z-]+)$/.exec((req.url??'').split('?')[0])?.[1];
+  const key=runtimeOperations.has(op)?op:'other';counts[key]=(counts[key]??0)+1;
+  req.resume();res.writeHead(503,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end('{"error":"doctor_outage"}');
+ });
+ await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});
+ return {counts,close:()=>{server.closeAllConnections();return new Promise(r=>server.close(r));}};
+}
 const deniedReasons={forbidden:new Set(['permission_denied','missing_scope','policy_denied','action_not_registered']),cross_tenant:new Set(['permission_denied','invalid_arguments','policy_denied'])};
 const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function readPlan(plan,env){
@@ -90,13 +106,16 @@ function readPlan(plan,env){
   if(typeof token!=='string'||!token||token.length>16384||/[\r\n]/.test(token))throw Error(`Set ${caller.tokenEnv} to a synthetic test credential`);
   tokens[name]=token;
  }
+ const outage=plan.outageRuntime;
+ if(outage!==undefined&&(typeof outage!=='object'||outage===null||!Number.isInteger(outage.port)||outage.port<1024||outage.port>65535||Object.keys(outage).length!==1))throw Error('outageRuntime needs only a port from 1024 to 65535');
  if(!Array.isArray(plan.checks)||!plan.checks.length||plan.checks.length>32)throw Error('List one to 32 checks');
  for(const c of plan.checks){
   if(!kinds.has(c?.kind)||!Object.hasOwn(tokens,c.caller)||typeof c.tool!=='string'||!c.tool||c.tool.length>128)throw Error('Each check needs a kind, a named caller and a tool');
   if(c.arguments!==undefined&&(typeof c.arguments!=='object'||c.arguments===null||Array.isArray(c.arguments)||JSON.stringify(c.arguments).length>4096))throw Error('Check arguments must be a JSON object up to 4 KiB');
   if(c.kind==='cancellation'&&!(Number.isInteger(c.afterMs)&&c.afterMs>=1&&c.afterMs<=5000))throw Error('Cancellation checks need afterMs from 1 to 5000');
+  if(c.kind==='closed_limit'&&!outage)throw Error('closed_limit checks need outageRuntime');
  }
- return {endpoint,tokens,checks:plan.checks,propertyId:plan.propertyId};
+ return {endpoint,tokens,checks:plan.checks,propertyId:plan.propertyId,outagePort:outage?.port};
 }
 const actionError=result=>result?._meta?.['webdecoy.com/action-error'];
 
@@ -113,10 +132,15 @@ export async function checkMCPRoute({plan,env=process.env,timeoutMs=3000}){
   callbacks:'not_observable_out_of_process',browserReceipts:'not_required_for_machine_callers',effectiveControls:'run inspectMCPControls(mcpOptions) in your process'};
  let parsed;
  try{parsed=readPlan(plan,env);}catch(e){report.checks.push({name:'plan',status:'unconfigured',remediation:e.message});return report;}
- const {endpoint,tokens,checks,propertyId}=parsed,first=Object.keys(tokens)[0];
+ const {endpoint,tokens,checks,propertyId,outagePort}=parsed,first=Object.keys(tokens)[0];
+ let outage;const clients={};
+ if(outagePort!==undefined){
+  try{outage=await startOutageRuntime(outagePort);}
+  catch{report.checks.push({name:'outage_runtime',status:'unconfigured',remediation:`Port ${outagePort} is unavailable on 127.0.0.1; choose a free port and point the server at it.`});return report;}
+ }
+ try{
  report.route=await verifyMCPRoute({resource:endpoint.href,token:tokens[first],timeoutMs:Math.min(timeoutMs,10000)});
  report.exercised.routes=report.route.passed?[...routes]:[];
- const clients={};
  try{
   if(!report.route.passed){for(const c of checks)report.checks.push({kind:c.kind,tool:c.tool,caller:c.caller,status:'not_run',remediation:'Fix the route checks first.'});return report;}
   const connect=async name=>{
@@ -141,7 +165,9 @@ export async function checkMCPRoute({plan,env=process.env,timeoutMs=3000}){
      const result=await client.callTool({name:c.tool,arguments:c.arguments??{}},undefined,{timeout:timeoutMs});
      const denial=actionError(result),actionId=result?._meta?.['webdecoy.com/action']?.actionId;
      if(typeof actionId==='string'&&uuid.test(actionId))entry.actionId=actionId.toLowerCase();
-     if(c.kind==='allowed')Object.assign(entry,!result.isError?{status:'verified',observed:'allowed'}:
+     if(c.kind==='closed_limit')Object.assign(entry,denial?.status===503?{status:'verified',observed:{reason:denial.reason,status:503}}:
+      {status:'failed',observed:denial?{reason:denial.reason,status:denial.status}:'allowed',remediation:'With WebDecoy unavailable this tool was not refused. For a hard limit, set the limit to mode \'enforce\' and failureMode \'closed\'; otherwise use an allowed check, since open limits are designed to let calls through.'});
+     else if(c.kind==='allowed')Object.assign(entry,!result.isError?{status:'verified',observed:'allowed'}:
       {status:'failed',observed:denial?{reason:denial.reason,status:denial.status}:'tool error',remediation:denial?`Expected an allowed call but WebDecoy denied it (${denial.reason}). Check authenticate, requiredScopes, validate and authorize for this tool, and the plan's arguments.`:'The tool ran and reported an error. Check the application callback.'});
      else Object.assign(entry,denial&&deniedReasons[c.kind].has(denial.reason)?{status:'verified',observed:{reason:denial.reason,status:denial.status}}:
       !result.isError?{status:'failed',observed:'allowed',remediation:c.kind==='forbidden'?'This caller was allowed. Add requiredScopes or make authorize() return false for it.':'Another tenant\'s resource was allowed. authorize() must compare the trusted caller.tenant with the resource owner, not a caller-supplied argument.'}:
@@ -156,6 +182,14 @@ export async function checkMCPRoute({plan,env=process.env,timeoutMs=3000}){
    report.checks.push(entry);
   }
  }finally{await Promise.all(Object.values(clients).map(c=>c.close().catch(()=>{})));}
+ }finally{await outage?.close();}
+ if(outage){
+  // Only control requests prove the server consulted the stand-in during the calls; discovery reports alone do not.
+  const controlRequests=Object.entries(outage.counts).filter(([k])=>k!=='reports').reduce((n,[,v])=>n+v,0);
+  report.outageRuntime={url:`http://127.0.0.1:${outagePort}`,response:503,requests:outage.counts,controlRequests};
+  if(controlRequests===0)for(const c of report.checks)if((c.kind==='allowed'||c.kind==='closed_limit')&&c.status==='verified')Object.assign(c,{status:'inconclusive',remediation:`The server never asked the stand-in runtime for a decision, so this result does not show outage behavior. Start a local copy of the server with its WebDecoy runtime URL set to http://127.0.0.1:${outagePort}, with shared limits configured on this tool.`});
+  if(controlRequests>0)report.notExercised=report.notExercised.filter(n=>!n.startsWith('runtime outages'));
+ }
  report.exercised.tools=[...new Set(checks.map(c=>c.tool))].sort();
  report.exercised.callers=Object.keys(clients).length;
  report.passed=report.checks.every(c=>c.status==='verified');

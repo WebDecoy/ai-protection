@@ -102,15 +102,52 @@ redirects. It exits non-zero unless every check is `verified`:
 | `forbidden` | WebDecoy denies with `permission_denied`, `missing_scope`, `policy_denied` or `action_not_registered`, or the route refuses with HTTP 403 `insufficient_scope` |
 | `cross_tenant` | WebDecoy denies with `permission_denied`, `invalid_arguments` or `policy_denied` |
 | `cancellation` | the client cancels after `afterMs` and the server still answers. A call that finishes first is `inconclusive`, not a pass |
+| `closed_limit` | outage runs only (below): WebDecoy refuses the call with HTTP 503 |
 
 A refusal for an unexpected reason fails: an input-validation error does not
 prove the permission control. Each failed check says what to change.
 
 The report lists the routes, tools and callers it actually exercised, and what it
-did not: runtime outages, alternate routes and unwrapped handlers, model budgets,
-and tool progress streaming. Tool callbacks run in your process, so `check` cannot
+did not: runtime outages (unless you run the outage check below), alternate routes
+and unwrapped handlers, model budgets, and tool progress streaming. Tool callbacks run in your process, so `check` cannot
 count them; it reports protocol evidence. To count callbacks, use
 `collectMCPDiagnostics` (below) or your own counters, as the sample does.
+
+### Outage check
+
+To see what your server does when WebDecoy is unreachable, add `outageRuntime` to
+the plan. `check` then serves a stand-in WebDecoy runtime on
+`http://127.0.0.1:<port>` that answers every request with HTTP 503, and counts the
+requests it receives.
+
+```json
+{
+  "schema": 1,
+  "resource": "http://127.0.0.1:8093/mcp",
+  "outageRuntime": {"port": 8787},
+  "callers": {"owner": {"tokenEnv": "MCP_TEST_TOKEN_A"}},
+  "checks": [
+    {"kind": "allowed", "caller": "owner", "tool": "search"},
+    {"kind": "closed_limit", "caller": "owner", "tool": "export"},
+    {"kind": "forbidden", "caller": "owner", "tool": "admin"}
+  ]
+}
+```
+
+Start a local copy of your server with its WebDecoy runtime URL
+(`sharedRuntime.webdecoyUrl`) set to `http://127.0.0.1:8787`, then run `check`.
+Never point a production server at it. In an outage run:
+
+- `allowed` shows that a tool whose limits are open keeps working;
+- `closed_limit` is verified only when WebDecoy refuses the call with HTTP 503,
+  which is what an `enforce` limit with `failureMode: 'closed'` does. A permission
+  denial does not count;
+- `forbidden` and `cross_tenant` show that your own authorization still applies.
+
+The report includes the stand-in's request counts. If the server never asked it
+for a decision (`controlRequests: 0`), `allowed` and `closed_limit` results are
+`inconclusive`: the server was not using the stand-in, so they show nothing about
+outage behavior. Discovery reports alone do not count as decisions.
 
 With `propertyId`, the report links the AI Protection dashboard to the first call
 that returned an action ID, and gives the time window of the run. Servers on
