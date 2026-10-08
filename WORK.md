@@ -1,4 +1,4 @@
-# Bounded tool work (Alpha)
+# Bounded tool work (Beta)
 
 The Node action and MCP APIs support optional weighted tool-work reservations.
 Available in `@webdecoy/ai-protection@0.1.0-alpha.5`. Requires the

@@ -1,4 +1,4 @@
-# Protected record actions (Alpha)
+# Protected record actions
 
 Run `node examples/actions/records.mjs` from this source checkout. It performs one
 permitted read, denies a cross-tenant read and an export, and rejects a forged
@@ -58,7 +58,7 @@ an event is absent.
 ## Shared limits and hosted evidence
 
 Supply `sharedRuntime` to `createActionProtection` and `limits` on each applicable
-action. The published Node Alpha and hosted AI Protection runtime support these
+action. The published Node SDK and hosted AI Protection runtime support these
 controls and schema-2 action reports.
 
 ```js

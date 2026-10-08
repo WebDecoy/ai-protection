@@ -1,7 +1,7 @@
 # Auth0 access tokens → protected actions (development example)
 
 This source-only example verifies Auth0 RS256 custom-API access tokens with `jose`
-and maps authenticated identity into the Alpha action boundary. It adds no
+and maps authenticated identity into the action boundary. It adds no
 runtime dependency to the core SDK.
 
 ```sh

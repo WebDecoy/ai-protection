@@ -1,4 +1,4 @@
-name: Publish alpha to npm
+name: Publish to npm
 on:
   release:
     types: [published]
@@ -22,7 +22,7 @@ jobs:
       - name: Verify release version
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
-        run: node --input-type=module -e "import p from './package.json' with {type:'json'}; if(process.env.RELEASE_TAG!=='v'+p.version || !/^\d+\.\d+\.\d+-alpha\.\d+$/.test(p.version))throw Error('Expected matching alpha version tag');"
+        run: node --input-type=module -e "import p from './package.json' with {type:'json'}; if(process.env.RELEASE_TAG!=='v'+p.version || !/^\d+\.\d+\.\d+-(alpha|beta)\.\d+$/.test(p.version))throw Error('Expected matching alpha or beta version tag');"
       - run: npm ci
       - run: npm test
       - run: npm run test:workers
@@ -30,4 +30,14 @@ jobs:
       - run: npm run check:package
       - run: npm ci && npm run build -- --webpack && npm test
         working-directory: examples/nextjs
-      - run: npm publish --access public --tag alpha
+      # Alphas stay on the alpha dist-tag. Betas go to latest, so a plain
+      # `npm install @webdecoy/ai-protection` gets the beta. Trusted publishing
+      # authorizes publish only, not a later dist-tag move, so the tag is set here.
+      - name: Publish
+        run: |
+          version=$(node -p "require('./package.json').version")
+          case "$version" in
+            *-beta.*) tag=latest ;;
+            *) tag=alpha ;;
+          esac
+          npm publish --access public --tag "$tag"

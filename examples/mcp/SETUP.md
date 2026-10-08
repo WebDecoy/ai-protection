@@ -25,7 +25,7 @@ node scripts/setup-mcp.mjs rollback /absolute/path/to/app src/mcp-options.ts
 
 `plan` reads bounded package/source files and prints a proposed addition plus
 metadata checks. Review it first. `apply` requires exact tested dependency pins
-(`@webdecoy/ai-protection@0.1.0-alpha.19`, MCP SDK `1.31.0`) and `type: module`.
+(`@webdecoy/ai-protection@0.1.0-beta.0`, MCP SDK `1.31.0`) and `type: module`.
 Other dependency ranges are unverified, not automatically upgraded. It creates
 `webdecoy-mcp.ts` beside the selected module using exclusive creation. Repeating
 apply is a no-op when the contents match; an existing different file is untouched.

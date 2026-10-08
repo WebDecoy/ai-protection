@@ -39,7 +39,7 @@ npm install /tmp/webdecoy-ai-protection-0.1.0-alpha.1.tgz
 
 The tarball contains the adapter, declarations and shared core; it does not
 need this checkout at runtime. The initial npm release is pending. Once published, install the pilot with
-`npm install @webdecoy/ai-protection@alpha`. There is no automatic marketplace installer.
+`npm install @webdecoy/ai-protection`. There is no automatic marketplace installer.
 
 1. In WebDecoy, select an existing property on **AI Abuse Protection**.
 2. Create a property-scoped key with Write Detections permission.

@@ -4,7 +4,7 @@ Bot and abuse protection for AI-powered applications. A small Node.js SDK that
 checks requests before your application invokes a model. Customer-defined rules run
 locally; proprietary bot detection runs in WebDecoy. See [architecture](ARCHITECTURE.md).
 
-**Alpha release: `0.1.0-alpha.12`.** Integration mechanics are tested;
+**Beta release: `0.1.0-beta.0`.** Integration mechanics are tested;
 real-world detection accuracy and provider cost savings have not been established.
 Requires a WebDecoy property, a property-scoped API key, and a compatible WebDecoy
 service deployment. This repository contains the SDK, not the detection service.
@@ -12,7 +12,7 @@ service deployment. This repository contains the SDK, not the detection service.
 ## Install
 
 ```sh
-npm install @webdecoy/ai-protection@alpha
+npm install @webdecoy/ai-protection
 ```
 
 Node.js 22.22.3 or newer is required. The SDK has no runtime npm dependencies.
@@ -71,7 +71,7 @@ binding falls back to observation and skips scoring. Missing trusted IPs also sk
 scoring and emit a degraded-coverage event. Successful chat alone does not prove
 protection is connected. Cancelled requests never start the protected callback. Enforced local rule errors
 return 503 by default; this is separate from remote detector failure behavior.
-A challenge verdict has no interactive verification UI in this alpha.
+A challenge verdict has no interactive verification UI in this beta.
 
 ## Data and scope
 
@@ -317,7 +317,8 @@ verified for the documented pattern (`check()`, then `budget.run` with
 
 ## Release and runtime contract
 
-The SDK is published under Apache-2.0 on the `alpha` npm dist-tag. WebDecoy's
+The SDK is published under Apache-2.0. Beta releases use the default `latest` npm dist-tag;
+earlier alphas remain on `alpha`. WebDecoy's
 hosted detection service is separate and is not included in this package.
 
 Control-plane JSON responses are capped at 64 KiB (2 KiB for stateful controls).
@@ -364,7 +365,7 @@ snapshot, not current quota state.
 Only admission is deduplicated. Repeated application/model calls still require
 application-level idempotency. The hosted runtime must support quota schema 2 before enabling this option.
 
-## Action authorization (Alpha)
+## Action authorization
 
 Version `0.1.0-alpha.3` includes an action boundary at `@webdecoy/ai-protection/actions`. See the
 [record-action example and integration contract](examples/actions/README.md).
@@ -378,7 +379,7 @@ To install it, start with `scripts/doctor-mcp.mjs detect`, then verify the runni
 outage) with `doctor-mcp.mjs check`; see the [MCP setup guide](examples/mcp/SETUP.md). From `alpha.19`,
 every tool result carries the action ID used in its reported evidence.
 
-## Weighted tool work (Alpha)
+## Weighted tool work
 
 Node alpha.5 adds weighted tool-work reservations and tenant concurrency. See
 [bounded tool work](WORK.md) for installation, enforced application bounds and

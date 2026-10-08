@@ -1,4 +1,4 @@
-# MCP tool protection (Alpha)
+# MCP tool protection (Beta)
 
 `@webdecoy/ai-protection/mcp` is a Node HTTP handler for a closed registry of
 protected tools. It runs in your application's backend. Your MCP traffic stays
@@ -8,10 +8,10 @@ resource authorization.
 
 ## Install
 
-Available in `0.1.0-alpha.5` and later compatible alpha releases:
+Available in `0.1.0-alpha.5` and later releases:
 
 ```sh
-npm install @webdecoy/ai-protection@0.1.0-alpha.19 @modelcontextprotocol/sdk@1.31.0
+npm install @webdecoy/ai-protection@0.1.0-beta.0 @modelcontextprotocol/sdk@1.31.0
 ```
 
 Requires Node 22.22.3+ and MCP SDK **1.31.0**. The MCP SDK is an optional peer, so
@@ -111,7 +111,7 @@ have unknown work. Never retry writes without application/provider idempotency.
   405. Reconnects do not grant fresh identity allowances.
 - Resources, prompts, tasks, sampling, elicitation, other routes and pre-existing
   MCP handlers are not wrapped. Unregistered methods/tools do not dispatch.
-  Weighted tool work is available in the alpha API; see [bounded work](WORK.md)
+  Weighted tool work is available in the API; see [bounded work](WORK.md)
   for its runtime prerequisite and application-enforced bounds. Full product
   acceptance remains separate from this adapter's tested contract.
 
@@ -284,7 +284,7 @@ running configuration or prove that unwrapped routes are protected. A changed
 scope or callback does not change the input-schema hash. No enforcement behavior
 changes when discovery is enabled.
 
-## Explicit decoy tools (Alpha)
+## Explicit decoy tools
 
 Decoys are off by default. Node alpha.11 supports up to eight explicitly named
 synthetic tools in the protected registry; requires `discovery` and `sharedRuntime`.

@@ -11,7 +11,7 @@
     "test:types": "tsc --strict --noEmit --module nodenext --target es2022 test/types.mts test/mcp-types.mts",
     "test:workers": "node --test test/workers/*.test.mjs"
   },
-  "version": "0.1.0-alpha.19",
+  "version": "0.1.0-beta.0",
   "exports": {
     "./fetch": {
       "types": "./fetch.d.mts",
@@ -85,7 +85,7 @@
   },
   "publishConfig": {
     "access": "public",
-    "tag": "alpha"
+    "tag": "latest"
   },
   "keywords": [
     "ai",
