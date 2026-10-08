@@ -163,6 +163,12 @@ verify a stored check appears for the selected property. Real abuse/legitimate
 traffic labels are still needed to measure detection value. These tests validate
 integration mechanics, not detection accuracy or demand.
 
+To check your own protection options the same way before a pilot, run
+`checkModelProtection` from `scripts/doctor-model.mjs` (see [Verify the model path
+without a paid provider](README.md#verify-the-model-path-without-a-paid-provider)).
+It uses your options against a stand-in runtime and a stub provider, and reports
+what it did not exercise, including your route handler.
+
 ## Why this integration, and the competitive limit
 
 Vercel already offers [BotID for AI endpoints](https://vercel.com/kb/guide/protect-ai-endpoints-with-vercel-botid),
