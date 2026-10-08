@@ -82,8 +82,10 @@ export function createActionProtection(options) {
   if (!actions.size || actions.size > 128) throw Error('Expected 1–128 actions');
   const runtime=prepareActionRuntime(options,actions);
   let pendingEvents = 0;
-  return Object.freeze({flush:async()=>{await runtime?.flush();},async run(name, input, authenticationContext, {signal} = {}) {
+  return Object.freeze({flush:async()=>{await runtime?.flush();},async run(name, input, authenticationContext, {signal, onAction} = {}) {
     const actionId = randomUUID();
+    // Lets an adapter return the action ID to its caller; never affects the decision.
+    try { onAction?.(actionId); } catch {}
     // Unknown caller-controlled action strings are never placed in evidence.
     const action = actions.get(name), eventAction = action ? name : 'unregistered';
     let attempted = false,completed=false,lease,work,callerEvidence;

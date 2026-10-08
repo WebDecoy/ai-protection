@@ -115,4 +115,4 @@ export function createActionProtection<T>(options: {
   actions: Record<string, ActionDefinition>;
   /** Local best-effort observer. sharedRuntime enables independent hosted reporting. */
   onEvent?(event: ActionEvent): void | Promise<void>;
-}): {flush():Promise<void>;run(action: string, args: ActionInput, authenticationContext: T, options?: {signal?: AbortSignal}): Promise<unknown>};
+}): {flush():Promise<void>;run(action: string, args: ActionInput, authenticationContext: T, options?: {signal?: AbortSignal; /** Receives this invocation's action ID before any check runs. */ onAction?(actionId: string): void}): Promise<unknown>};

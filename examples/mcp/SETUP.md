@@ -25,7 +25,7 @@ node scripts/setup-mcp.mjs rollback /absolute/path/to/app src/mcp-options.ts
 
 `plan` reads bounded package/source files and prints a proposed addition plus
 metadata checks. Review it first. `apply` requires exact tested dependency pins
-(`@webdecoy/ai-protection@0.1.0-alpha.18`, MCP SDK `1.31.0`) and `type: module`.
+(`@webdecoy/ai-protection@0.1.0-alpha.19`, MCP SDK `1.31.0`) and `type: module`.
 Other dependency ranges are unverified, not automatically upgraded. It creates
 `webdecoy-mcp.ts` beside the selected module using exclusive creation. Repeating
 apply is a no-op when the contents match; an existing different file is untouched.
@@ -112,10 +112,12 @@ and tool progress streaming. Tool callbacks run in your process, so `check` cann
 count them; it reports protocol evidence. To count callbacks, use
 `collectMCPDiagnostics` (below) or your own counters, as the sample does.
 
-With `propertyId`, the report gives the AI Protection dashboard page for that
-property and the time window of the run. Results appear there only if your server
-reports to WebDecoy through `sharedRuntime`; reporting is best effort, and a
-single action is not linked individually.
+With `propertyId`, the report links the AI Protection dashboard to the first call
+that returned an action ID, and gives the time window of the run. Servers on
+alpha.19 or later return the ID on every tool result (see the MCP guide); older
+servers get the property page and the window instead. Results appear there only
+if your server reports to WebDecoy through `sharedRuntime`, and reporting is best
+effort.
 
 ## Interpretation of results
 

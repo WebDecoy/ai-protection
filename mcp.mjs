@@ -227,16 +227,23 @@ export function createProtectedMCPHandler(options) {
                     throw new McpError(ErrorCode.InvalidParams, 'Tool unavailable');
                 running.started = true;
                 const signal = AbortSignal.any([extra.signal, disconnected.signal, running.controller.signal]);
+                // The action ID matches this call's reported evidence, so the caller can find it in the dashboard.
+                let actionId;
+                const action = () => ({ 'webdecoy.com/action': { actionId } });
                 try {
-                    return await guard.run(request.params.name, (request.params.arguments ?? {}), caller, { signal });
+                    const result = await guard.run(request.params.name, (request.params.arguments ?? {}), caller, { signal, onAction: id => { actionId = id; } });
+                    if (!result || typeof result !== 'object' || Array.isArray(result))
+                        return result;
+                    const meta = result._meta && typeof result._meta === 'object' && !Array.isArray(result._meta) ? result._meta : {};
+                    return { ...result, _meta: { ...meta, ...action() } };
                 }
                 catch (e) {
                     if (signal.aborted)
                         throw new McpError(ErrorCode.InternalError, 'Request cancelled');
                     if (e instanceof ActionDenied)
                         return { isError: true, content: [{ type: 'text', text: `Action denied: ${e.reason}` }],
-                            _meta: { 'webdecoy.com/action-error': { reason: e.reason, status: e.status, ...(e.retryAfterSeconds ? { retryAfterSeconds: e.retryAfterSeconds } : {}) } } };
-                    return { isError: true, content: [{ type: 'text', text: 'Action failed; outcome may be unknown' }] };
+                            _meta: { ...action(), 'webdecoy.com/action-error': { reason: e.reason, status: e.status, ...(e.retryAfterSeconds ? { retryAfterSeconds: e.retryAfterSeconds } : {}) } } };
+                    return { isError: true, content: [{ type: 'text', text: 'Action failed; outcome may be unknown' }], _meta: action() };
                 }
                 finally {
                     cleanup();
