@@ -271,6 +271,50 @@ non-sensitive price/rule codes. Reporting remains bounded and best effort;
 failures do not change provider results, trigger retries or refund charges.
 Requires the compatible usage endpoint; old backends may log reporting failures.
 
+## Verify the model path without a paid provider
+
+From an SDK source checkout, `scripts/doctor-model.mjs` runs synthetic checks in
+your own process. It builds protection from your options against a stand-in
+WebDecoy runtime on loopback and a counting stub provider. Nothing contacts a
+model provider, the real runtime or your users.
+
+```js
+import {checkModelProtection} from './scripts/doctor-model.mjs';
+import {createAIProtection, createAIBudget} from '@webdecoy/ai-protection';
+
+const report = await checkModelProtection({
+  protection: protectionOptions,          // what you pass to createAIProtection
+  budget: budgetOptions,                  // optional: what you pass to createAIBudget
+  allowedContext: {plan: 'pro', account: 'test-account'},
+  deniedContext: {plan: 'blocked', account: 'test-account'},  // optional: a context your enforced rule refuses
+  createProtection: createAIProtection,   // check your installed version
+  createBudget: createAIBudget,
+});
+console.log(JSON.stringify(report, null, 2));
+```
+
+Checks, each with an independent provider call count:
+
+| Check | Verified when |
+| --- | --- |
+| `allowed` | an allowed context reaches the provider exactly once |
+| `local_denial` | `deniedContext` is refused and the provider is never called |
+| `detector_block` | a block verdict stops the call in enforce mode, or is only recorded in observe mode |
+| `streaming` | the provider's stream arrives unchanged and in order |
+| `cancellation` | aborting the request stops the provider work |
+| `outage` | with the runtime returning 503, the result matches your failure modes: deny with 503 for closed enforced controls, otherwise allow with degraded coverage |
+| `budget_settlement` | a reserved call settles and its usage reports carry the admission's request ID |
+| `budget_denied` | an exceeded budget stops the call in enforce mode, or is only recorded in observe mode |
+
+Diagnostics label browser receipts (unconfigured, forwarded or not forwarded;
+validity is never checked locally because receipts are signed by WebDecoy),
+reporting (disabled, delivered, whether a host lifecycle hook is set), request
+correlation and budget settlement. The report lists every value the doctor
+overrides and what it does not exercise: your route handler and provider client,
+real detection verdicts, cold-start outages and limit exhaustion. Correlation is
+verified for the documented pattern (`check()`, then `budget.run` with
+`requestId: decision.id`); your handler must pass the ID the same way.
+
 ## Release and runtime contract
 
 The SDK is published under Apache-2.0 on the `alpha` npm dist-tag. WebDecoy's
