@@ -94,8 +94,11 @@ test('check verifies the sample route with independent callback counts',{timeout
  // The sample's own counters agree with the protocol evidence.
  for(let i=0;i<100&&!counters.cancelled;i++)await new Promise(r=>setTimeout(r,10));
  assert.deepEqual(counters,{reads:2,forbidden:0,waiting:1,cancelled:1});
- assert.equal(report.dashboard.url,`https://app.webdecoy.com/ai-protection?property=${property}`);
- assert.equal(report.dashboard.individuallyLinked,false);
+ const first=report.checks[0].actionId;assert.match(first,/^[0-9a-f-]{36}$/);
+ assert.equal(report.dashboard.url,`https://app.webdecoy.com/ai-protection?property=${property}&action=${first}`);
+ assert.equal(report.dashboard.individuallyLinked,true);assert.deepEqual(report.dashboard.linkedCheck,{kind:'allowed',tool:'read',actionId:first});
+ // Denied calls are linkable too; each call has its own ID.
+ assert.match(report.checks[2].actionId,/^[0-9a-f-]{36}$/);assert.equal(new Set(report.checks.filter(c=>c.actionId).map(c=>c.actionId)).size,5);
  assert.ok(Date.parse(report.window.from)<=Date.parse(report.window.to));
  const text=JSON.stringify(report);for(const token of Object.values(env))assert.ok(!text.includes(token),'token leaked');
 });

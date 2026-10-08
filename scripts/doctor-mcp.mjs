@@ -139,7 +139,8 @@ export async function checkMCPRoute({plan,env=process.env,timeoutMs=3000}){
       {status:'failed',observed:'call failed before cancellation',remediation:'Check that the caller may call this tool, then retry.'});
     }else{
      const result=await client.callTool({name:c.tool,arguments:c.arguments??{}},undefined,{timeout:timeoutMs});
-     const denial=actionError(result);
+     const denial=actionError(result),actionId=result?._meta?.['webdecoy.com/action']?.actionId;
+     if(typeof actionId==='string'&&uuid.test(actionId))entry.actionId=actionId.toLowerCase();
      if(c.kind==='allowed')Object.assign(entry,!result.isError?{status:'verified',observed:'allowed'}:
       {status:'failed',observed:denial?{reason:denial.reason,status:denial.status}:'tool error',remediation:denial?`Expected an allowed call but WebDecoy denied it (${denial.reason}). Check authenticate, requiredScopes, validate and authorize for this tool, and the plan's arguments.`:'The tool ran and reported an error. Check the application callback.'});
      else Object.assign(entry,denial&&deniedReasons[c.kind].has(denial.reason)?{status:'verified',observed:{reason:denial.reason,status:denial.status}}:
@@ -160,7 +161,10 @@ export async function checkMCPRoute({plan,env=process.env,timeoutMs=3000}){
  report.passed=report.checks.every(c=>c.status==='verified');
  const finished=new Date();
  report.window={from:started.toISOString(),to:finished.toISOString()};
- report.dashboard=propertyId?{url:`https://app.webdecoy.com/ai-protection?property=${propertyId.toLowerCase()}`,locate:`Action results for ${report.exercised.tools.join(', ')} between ${report.window.from} and ${report.window.to}`,individuallyLinked:false,
+ // Link the first call that returned an action ID (alpha.19+). Older servers get the page and window.
+ const linked=report.checks.find(c=>c.actionId);
+ report.dashboard=propertyId?{url:`https://app.webdecoy.com/ai-protection?property=${propertyId.toLowerCase()}${linked?`&action=${linked.actionId}`:''}`,locate:`Action results for ${report.exercised.tools.join(', ')} between ${report.window.from} and ${report.window.to}`,individuallyLinked:!!linked,
+  ...(linked?{linkedCheck:{kind:linked.kind,tool:linked.tool,actionId:linked.actionId}}:{}),
   note:'Appears only if the server reports to WebDecoy (sharedRuntime). Reporting is best effort; absence here is not proof the call ran.'}:{url:null,note:'Add propertyId to the plan to get the dashboard location.'};
  return report;
 }

@@ -11,7 +11,7 @@ resource authorization.
 Available in `0.1.0-alpha.5` and later compatible alpha releases:
 
 ```sh
-npm install @webdecoy/ai-protection@0.1.0-alpha.18 @modelcontextprotocol/sdk@1.31.0
+npm install @webdecoy/ai-protection@0.1.0-alpha.19 @modelcontextprotocol/sdk@1.31.0
 ```
 
 Requires Node 22.22.3+ and MCP SDK **1.31.0**. The MCP SDK is an optional peer, so
@@ -114,6 +114,12 @@ have unknown work. Never retry writes without application/provider idempotency.
   Weighted tool work is available in the alpha API; see [bounded work](WORK.md)
   for its runtime prerequisite and application-enforced bounds. Full product
   acceptance remains separate from this adapter's tested contract.
+
+From alpha.19, every tool result also carries `_meta["webdecoy.com/action"].actionId`:
+allowed results (merged with your own `_meta`), denials and failed callbacks alike.
+It is the action ID on that call's reported evidence, so the caller or an operator
+can find the exact action in the dashboard. It is a random identifier per call and
+carries no identity, arguments or result content.
 
 This is an explicit tools integration, not transparent protection of an existing
 whole MCP server. See the [MCP transport specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)
