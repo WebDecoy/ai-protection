@@ -43,7 +43,7 @@ const actionCaller: TrustedCaller = {schema:1, subject:'u', tenant:'t', issuer:'
   authenticationMethod:'session', expiresAt:Date.now()+60000, scopes:['read']};
 const actions = createActionProtection({policyVersion:'v1',authenticate:(_session:string)=>actionCaller,
   actions:{read:{requiredScopes:['read'],validate:()=>true,authorize:({caller})=>caller.tenant==='t',
-    execute:({signal})=>signal?.aborted??false}}});
+    execute:({signal,actionId})=>({aborted:signal?.aborted??false,actionId})}}});
 void actions.run('read',{id:'r'},'server-session');
 // @ts-expect-error Authentication context must match the server verifier.
 void actions.run('read',{},123);
@@ -52,7 +52,7 @@ const weightedActions=createActionProtection({policyVersion:'weighted_v1',authen
  sharedRuntime:{webdecoyUrl:'https://example.test',webdecoyKey:'fixture',propertyId:'11111111-1111-4111-8111-111111111111',subjectSecret:'x'.repeat(32)},
  actions:{search:{requiredScopes:[],validate:()=>true,authorize:()=>true,
  limits:{work:{ruleId:'search_work',maxUnits:11,windowSeconds:60,limits:{caller:22,tenant:44,tool:88},measure:result=>typeof result==='number'?result:11},tenantConcurrency:{ruleId:'tenant_search',accountLimit:2,featureLimit:10}},
- execute:({work})=>work!.maxUnits}}});
+ execute:({work,actionId})=>actionId.length+work!.maxUnits}}});
 void weightedActions.run('search',{},null);
 
 import {createWorkerAIProtection} from '../workers.mjs';
