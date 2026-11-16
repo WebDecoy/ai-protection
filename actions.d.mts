@@ -13,6 +13,8 @@ export interface TrustedCaller {
 }
 export type ActionInput = null | boolean | number | string | readonly ActionInput[] | {readonly [key:string]: ActionInput};
 export interface ActionContext {
+  /** Stable for this invocation. Pass as a model-budget requestId to correlate sanitized usage with action evidence. */
+  readonly actionId: string;
   readonly work?: {readonly maxUnits:number};
   readonly caller: TrustedCaller;
   readonly args: ActionInput;

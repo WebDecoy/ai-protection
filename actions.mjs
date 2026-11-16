@@ -117,7 +117,9 @@ export function createActionProtection(options) {
       callerEvidence=runtime?.callerEvidence(caller);
       cancelled();
       if (action.requiredScopes.some(scope => !caller.scopes.includes(scope))) deny('missing_scope',403);
-      const context = Object.freeze({caller, args, signal:admissionSignal});
+      // The stable action ID is safe correlation metadata. Applications can pass
+      // it to model-budget requestId without exposing prompts, arguments or identity.
+      const context = Object.freeze({actionId, caller, args, signal:admissionSignal});
       let valid;
       try { valid = await evaluate(() => action.validate(args)); } catch { cancelled(); deny('invalid_arguments',400); }
       cancelled();

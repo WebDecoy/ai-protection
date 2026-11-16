@@ -262,6 +262,13 @@ Keep `run.accounting` alive with host lifecycle support, then `budget.flush()`
 can drain queued reports. Budget reporting accepts `waitUntil`,
 `reportingTimeoutMs`, `maxPendingReports` and `reportToWebDecoy`.
 
+Inside a protected action, `ActionContext.actionId` is the stable invocation
+correlation ID. Pass that value as the budget call's `requestId` when the action
+starts model work. The dashboard can then join the sanitized request, policy,
+work and numeric model-usage evidence. If it is omitted, the dashboard reports
+model evidence as missing rather than inferring that no model ran. Never replace
+it with an MCP request/session ID or put prompts, arguments or resource IDs in it.
+
 The dashboard labels callback starts and final usage as SDK-reported and joins
 retained reservations to confirm accounting. Neither is a provider invoice.
 Missing usage is unknown, and avoided cost is unavailable—not inferred from

@@ -13,9 +13,12 @@ function fixture(overrides={}) {
 }
 const denied = reason => e => e instanceof ActionDenied && e.reason===reason;
 test('allowed result is preserved and correlated evidence contains no identity or arguments',async()=>{
- const f=fixture();assert.deepEqual(await f.guard.run('read',{recordId:'a'},{}),{id:'a'});
- assert.equal(f.calls(),1);assert.deepEqual(f.events.map(e=>e.outcome),['attempted','completed']);
+ let executionActionId;
+ const f=fixture({action:{execute:({args,actionId})=>{executionActionId=actionId;return {id:args.recordId};}}});
+ assert.deepEqual(await f.guard.run('read',{recordId:'a'},{}),{id:'a'});
+ assert.deepEqual(f.events.map(e=>e.outcome),['attempted','completed']);
  assert.equal(f.events[0].actionId,f.events[1].actionId);
+ assert.equal(executionActionId,f.events[0].actionId);
  for(const secret of ['user-a','tenant-a','recordId','test-auth'])assert.ok(!JSON.stringify(f.events).includes(secret));
 });
 for(const [name,overrides,input,reason] of [
